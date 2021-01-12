@@ -85,7 +85,7 @@ class Preprocessor():
         db['column2table'], db['table2columns'] = column2table, table2columns
 
         t_num, c_num, dtype = len(db['table_names']), len(db['column_names']), '<U100'
-        
+
         # relations in tables, tab_num * tab_num
         tab_mat = np.array([['table-table'] * t_num for _ in range(t_num)], dtype=dtype)
         table_fks = set(map(lambda pair: (column2table[pair[0]], column2table[pair[1]]), db['foreign_keys']))
@@ -95,7 +95,7 @@ class Preprocessor():
             else:
                 tab_mat[tab1, tab2], tab_mat[tab2, tab1] = 'table-table-fk', 'table-table-fkr'
         tab_mat[list(range(t_num)), list(range(t_num))] = 'table-table-identity'
-        
+
         # relations in columns, c_num * c_num
         col_mat = np.array([['column-column'] * c_num for _ in range(c_num)], dtype=dtype)
         for i in range(t_num):
@@ -125,7 +125,7 @@ class Preprocessor():
             np.concatenate([col_tab_mat, col_mat], axis=1)
         ], axis=0)
         db['relations'] = relations.tolist()
-        
+
         if verbose:
             print('Tables:', ', '.join(db['table_names']))
             print('Lemmatized:', ', '.join(table_names))
