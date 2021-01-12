@@ -167,7 +167,7 @@ class Preprocessor():
         return entry
 
     def extract_subgraph(self, entry: dict, db: dict, verbose: bool = False):
-        sql, closure = entry['sql'], db['column_closure']
+        sql = entry['sql']
         used_schema = {'table': set(), 'column': set()}
         used_schema = self.extract_subgraph_from_sql(sql, used_schema)
         entry['used_tables'] = sorted(list(used_schema['table']))
