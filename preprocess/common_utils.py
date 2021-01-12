@@ -3,7 +3,7 @@ import os, sqlite3
 import numpy as np
 import stanza
 from nltk.corpus import stopwords
-from itertools import combinations
+from itertools import product, combinations
 from utils.constants import MAX_RELATIVE_DIST
 from transformers.tokenization_utils import _is_whitespace, _is_control, _is_punctuation
 
