@@ -151,8 +151,8 @@ class Evaluator():
                 else tempfile.TemporaryFile('w+t')
             # write pred and ref sqls
             for s in pred_sqls:
-                tmp.write(s + '\n')
-            tmp.flush()
+                tmp_pred.write(s + '\n')
+            tmp_pred.flush()
             for s, db in zip(ref_sqls, dbs):
                 tmp_ref.write(s + '\t' + db['db_id'] + '\n')
             tmp_ref.flush()

@@ -2,7 +2,7 @@
 
 from embeddings import GloveEmbedding, KazumaCharEmbedding
 import numpy as np
-from utils.vocab import PAD
+from utils.constants import PAD
 import torch, random
 
 class Word2vecUtils():
@@ -30,11 +30,3 @@ class Word2vecUtils():
             char_emb = self.char_embed.emb(word) if emb_size == 400 else []
             module.weight.data[vocab[word]] = torch.tensor(word_emb + char_emb, dtype=torch.float, device=device)
         return 1 - outliers / float(len(vocab))
-
-    def emb(self, word):
-        word_emb = self.word_embed.emb(word, default='none')
-        if word_emb[0] is None:
-            return None
-        else:
-            char_emb = self.char_embed.emb(word)
-            return word_emb + char_emb

@@ -1,11 +1,12 @@
 #coding=utf8
-"""
-    Utility functions include:
-        set output path, set logger, set random seed, select device
+""" Utility functions include:
+    1. set output logging path
+    2. set random seed for all libs
+    3. select torch.device
 """
 
 import sys, os, logging
-import random, torch
+import random, torch, dgl
 import numpy as np
 
 def set_logger(exp_path, testing=False):
@@ -29,15 +30,14 @@ def set_random_seed(random_seed=999):
     if torch.cuda.is_available():
         torch.cuda.manual_seed(random_seed)
     np.random.seed(random_seed)
+    dgl.random.seed(random_seed)
 
 def set_torch_device(deviceId):
     if deviceId < 0:
         device = torch.device("cpu")
-        # print('Use CPU ...')
     else:
         assert torch.cuda.device_count() >= deviceId + 1
         device = torch.device("cuda:%d" % (deviceId))
-        print('Use GPU with index %d' % (deviceId))
         # os.environ['CUDA_LAUNCH_BLOCKING'] = "1" # used when debug
         ## These two sentences are used to ensure reproducibility with cudnnbacken
         # torch.backends.cudnn.deterministic = True

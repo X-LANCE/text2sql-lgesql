@@ -1,43 +1,21 @@
 #coding=utf8
-PAD = '<pad>'
-UNK = '<unk>'
-BOS = '<s>'
-EOS = '</s>'
-
-POS = ['CC', 'CD', 'DT', 'EX', 'FW', 'IN', 'JJ', 'JJR', 'JJS', 'LS', 'MD', 'NN', 'NNS', 'NNP', 'NNPS',
-    'PDT', 'POS', 'PRP', 'PRP$', 'RB', 'RBR', 'RBS', 'RP', 'SYM', 'TO', 'UH',
-    'VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ', 'WDT', 'WP', 'WP$', 'WRB']
-
-COLUMN_TYPES = ['others', 'text', 'time', 'number', 'boolean']
-TYPE_CONTROL = ['NONE', 'AGG', 'MORE', 'MOST', 'NUMBER', 'YEAR']
-NER_4 = ['NONE', 'PER', 'LOC', 'ORG', 'MISC']
-NER_18 = ['NONE', 'PERSON', 'NORP', 'FAC', 'ORG', 'GPE', 'LOC', 'PRODUCT', 'EVENT',
-    'WORK_OF_ART', 'LAW', 'LANGUAGE', 'DATE', 'TIME',
-    'PERCENT', 'MONEY', 'QUANTITY', 'ORDINAL', 'CARDINAL']
-MAX_RELATIVE_DIST = 3
-RELATIVE_POSITION = ['no-relation', 'question-question'] + ['question-dist-' + str(i) for i in range(- MAX_RELATIVE_DIST, MAX_RELATIVE_DIST + 1, 1)] + \
-    ['column-column', 'column-identity', 'same-table', 'foreign-key-f', 'foreign-key-r'] + \
-    ['table-table', 'table-identity', 'foreign-key-tab-f', 'foreign-key-tab-r', 'foreign-key-tab-b'] + \
-    ['column-table', 'table-column', 'primary-key-f', 'primary-key-r', 'belongs-to-f', 'belongs-to-r'] + \
-    ['question-column-exactmatch', 'question-column-partialmatch', 'question-column-nomatch', 'value-column',
-    'column-question-exactmatch', 'column-question-partialmatch', 'column-question-nomatch', 'column-value'] + \
-    ['question-table-exactmatch', 'question-table-partialmatch', 'question-table-nomatch',
-    'table-question-exactmatch', 'table-question-partialmatch', 'table-question-nomatch']
+from utils.constants import PAD, UNK, BOS, EOS
 
 class Vocab():
 
-    def __init__(self, padding=True, unk=True, bos=False, min_freq=1, file_path=None, items=None, default=UNK, specials=[]):
+    def __init__(self, padding=False, unk=False, boundary=False, min_freq=1,
+            filepath=None, iterable=None, default=UNK, specials=[]):
         super(Vocab, self).__init__()
         self.word2id = dict()
         self.id2word = dict()
-        self.default = default
+        self.default = default # if default is None, ensure that no oov words
         if padding:
             idx = len(self.word2id)
             self.word2id[PAD], self.id2word[idx] = idx, PAD
         if unk:
             idx = len(self.word2id)
             self.word2id[UNK], self.id2word[idx] = idx, UNK
-        if bos:
+        if boundary:
             idx = len(self.word2id)
             self.word2id[BOS], self.id2word[idx] = idx, BOS
             self.word2id[EOS], self.id2word[idx + 1] = idx + 1, EOS
@@ -45,14 +23,14 @@ class Vocab():
             if w not in self.word2id:
                 idx = len(self.word2id)
                 self.word2id[w], self.id2word[idx] = idx, w
-        if file_path:
-            self.from_file(file_path, min_freq=min_freq)
-        elif items:
-            self.from_items(items)
+        if filepath is not None:
+            self.from_filepath(filepath, min_freq=min_freq)
+        elif iterable is not None:
+            self.from_iterable(iterable)
         assert (self.default is None) or (self.default in self.word2id)
 
-    def from_file(self, file_path, min_freq=1):
-        with open(file_path, 'r', encoding='utf-8') as inf:
+    def from_filepath(self, filepath, min_freq=1):
+        with open(filepath, 'r', encoding='utf-8') as inf:
             for line in inf:
                 line = line.strip()
                 if line == '': continue
@@ -68,14 +46,18 @@ class Vocab():
                     self.word2id[word] = idx
                     self.id2word[idx] = word
 
-    def from_items(self, items):
-        for item in items:
+    def from_iterable(self, iterable):
+        for item in iterable:
             if item not in self.word2id:
                 idx = len(self.word2id)
                 self.word2id[item] = idx
                 self.id2word[idx] = item
 
     def __len__(self):
+        return len(self.word2id)
+
+    @property
+    def vocab_size(self):
         return len(self.word2id)
 
     def __getitem__(self, key):

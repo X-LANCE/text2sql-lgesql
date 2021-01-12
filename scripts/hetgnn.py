@@ -12,8 +12,8 @@ from model.model_utils import Registrable
 from model.model_constructor import *
 
 # initialization params, output path, logger, random seed and torch.device
-args = init_args(sys.argv[1:], task='ratsql')
-exp_path = hyperparam_path(args, task='ratsql')
+args = init_args(sys.argv[1:], task='hetgnn')
+exp_path = hyperparam_path(args, task='hetgnn')
 if not os.path.exists(exp_path):
     os.makedirs(exp_path)
 logger = set_logger(exp_path, args.testing)
@@ -28,27 +28,28 @@ logger.info("Use GPU with index %s" % (args.device) if args.device >= 0 else "Us
 start_time = time.time()
 if args.read_model_path:
     params = json.load(open(os.path.join(args.read_model_path, 'params.json')), object_hook=lambda d: Namespace(**d))
-    args.ptm = params.ptm
-Example.configuration(ptm=args.ptm, processed=args.preprocess, add_cls=True) # set up the grammar, transition system, evaluator and tables
+    args.ptm, args.model, args.lazy_load = params.ptm, params.model, True
+# set up the grammar, transition system, evaluator, etc.
+Example.configuration(ptm=args.ptm, method=args.model, add_cls=True)
 train_dataset, dev_dataset = Example.load_dataset('train'), Example.load_dataset('dev')
 logger.info("Load dataset and database finished, cost %.4fs ..." % (time.time() - start_time))
 logger.info("Dataset size: train -> %d ; dev -> %d" % (len(train_dataset), len(dev_dataset)))
 sql_trans, evaluator = Example.trans, Example.evaluator
-args.word_vocab, args.relation_num = len(Example.word_vocab), len(Example.relative_position_vocab)
+args.word_vocab, args.relation_num = len(Example.word_vocab), len(Example.relation_vocab)
 
 # model init, set optimizer
 if args.read_model_path:
-    model = Registrable.by_name('ratsql')(params, sql_trans).to(device)
+    model = Registrable.by_name(args.method)(params, sql_trans).to(device)
     check_point = torch.load(open(os.path.join(args.read_model_path, 'model.bin'), 'rb'))
     model.load_state_dict(check_point['model'])
     logger.info("Load saved model from path: %s" % (args.read_model_path))
 else:
     json.dump(vars(args), open(os.path.join(exp_path, 'params.json'), 'w'), indent=4)
-    model = Registrable.by_name('ratsql')(args, sql_trans).to(device)
+    model = Registrable.by_name(args.method)(args, sql_trans).to(device)
     if args.ptm is None:
         ratio = Example.word2vec.load_embeddings(model.encoder.input_layer.word_embed, Example.word_vocab, device=device)
         logger.info("Init model and word embedding layer with a coverage %.2f" % (ratio))
-logger.info(str(model))
+# logger.info(str(model))
 num_training_steps = ((len(train_dataset) + args.batch_size - 1) // args.batch_size) * args.max_epoch
 num_warmup_steps = int(num_training_steps * args.warmup_ratio)
 logger.info('Total training steps: %d;\t Warmup steps: %d' % (num_training_steps, num_warmup_steps))
@@ -63,10 +64,10 @@ def decode(choice, output_path, acc_type='sql'):
     all_hyps = []
     with torch.no_grad():
         for i in range(0, len(dataset), args.batch_size):
-            current_batch = Batch.from_example_list(dataset[i: i + args.batch_size], device, train=False, method='ratsql')
+            current_batch = Batch.from_example_list(dataset[i: i + args.batch_size], device, train=False, method='hetgnn')
             hyps = model.parse(current_batch, args.beam_size)
             all_hyps.extend(hyps)
-        acc = evaluator.acc(all_hyps, dataset, output_path, acc_type=acc_type, etype='match', choice=choice)
+        acc = evaluator.acc(all_hyps, dataset, output_path, acc_type=acc_type, etype='match')
     torch.cuda.empty_cache()
     gc.collect()
     return acc
@@ -83,7 +84,7 @@ if not args.testing:
         for j in range(0, nsamples, step_size):
             count += 1
             cur_dataset = [train_dataset[k] for k in train_index[j: j + step_size]]
-            current_batch = Batch.from_example_list(cur_dataset, device, train=True, method='ratsql')
+            current_batch = Batch.from_example_list(cur_dataset, device, train=True, method='hetgnn')
             loss = model(current_batch) # see utils/batch.py for batch elements
             epoch_loss += loss.item()
             # print("Minibatch loss: %.4f" % (loss.item()))
@@ -115,12 +116,12 @@ if not args.testing:
 
     check_point = torch.load(open(os.path.join(exp_path, 'model.bin'), 'rb'))
     model.load_state_dict(check_point['model'])
-    # train_acc = decode('train', os.path.join(exp_path, 'train.iter' + str(best_result['iter'])), acc_type='ast')
+    train_acc = decode('train', os.path.join(exp_path, 'train.iter' + str(best_result['iter'])), acc_type='sql')
     dev_acc_beam = decode('dev', output_path=os.path.join(exp_path, 'dev.iter' + str(best_result['iter']) + '.beam' + str(args.beam_size)), acc_type='beam')
     logger.info('FINAL BEST RESULT: \tEpoch: %d\tDev acc/Beam acc: %.4f/%.4f' % (best_result['iter'], best_result['dev_acc'], dev_acc_beam))
 else:
     start_time = time.time()
-    # train_acc = decode('train', output_path=os.path.join(args.read_model_path, 'train.eval'), acc_type='ast')
+    train_acc = decode('train', output_path=os.path.join(args.read_model_path, 'train.eval'), acc_type='sql')
     dev_acc = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval'), acc_type='sql')
     dev_acc_beam = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval.beam' + str(args.beam_size)), acc_type='beam')
     logger.info("Evaluation costs %.2fs ; Dev dataset exact match/inner beam acc is %.4f/%.4f ." % (time.time() - start_time, dev_acc, dev_acc_beam))
