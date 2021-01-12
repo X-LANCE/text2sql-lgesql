@@ -112,11 +112,10 @@ class SQLTransitionSystem(TransitionSystem):
 if __name__ == '__main__':
 
     try:
-        from utils.example import GRAMMAR_PATH
-        from evaluator.evaluation import evaluate, build_foreign_key_map_from_json
+        from evaluation import evaluate, build_foreign_key_map_from_json
     except Exception:
-        print('Cannot find grammar file or evaluator ...')
-    grammar = ASDLGrammar.from_filepath(GRAMMAR_PATH)
+        print('Cannot find evaluator ...')
+    grammar = ASDLGrammar.from_filepath('asdl/sql/grammar/sql_asdl_v2.txt')
     print('Total number of productions:', len(grammar))
     for each in grammar.productions:
         print(each)
@@ -153,7 +152,7 @@ if __name__ == '__main__':
     with open('data/train_pred.sql', 'w') as of:
         for each in recovered_sqls:
             of.write(each + '\n')
-    with open('eval_train.log', 'w') as of:
+    with open('data/eval_train.log', 'w') as of:
         old_print = sys.stdout
         sys.stdout = of
         evaluate('data/train_gold.sql', 'data/train_pred.sql', 'data/database', 'match', kmaps)
@@ -168,7 +167,7 @@ if __name__ == '__main__':
     with open('data/dev_pred.sql', 'w') as of:
         for each in recovered_sqls:
             of.write(each + '\n')
-    with open('eval_dev.log', 'w') as of:
+    with open('data/eval_dev.log', 'w') as of:
         old_print = sys.stdout
         sys.stdout = of
         evaluate('data/dev_gold.sql', 'data/dev_pred.sql', 'data/database', 'match', kmaps)

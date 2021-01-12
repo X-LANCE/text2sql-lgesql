@@ -3,7 +3,7 @@ import argparse, os, sys, pickle, json
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from collections import Counter
 
-def construct_vocab_from_dataset(*data_paths, table_path='data/tables.bin', mwf=5, reference_file=None, output_path=None, sep='\t'):
+def construct_vocab_from_dataset(*data_paths, table_path='data/tables.bin', mwf=4, reference_file=None, output_path=None, sep='\t'):
     words = []
     tables = pickle.load(open(table_path, 'rb'))
     for fp in data_paths:
@@ -11,8 +11,8 @@ def construct_vocab_from_dataset(*data_paths, table_path='data/tables.bin', mwf=
         for ex in dataset:
             words.extend(ex['processed_question_toks'])
             db = tables[ex['db_id']]
-            # words.extend(['table'] * len(db['table_names']))
-            # words.extend(db['column_types'])
+            words.extend(['table'] * len(db['table_names']))
+            words.extend(db['column_types'])
             for c in db['processed_column_toks']:
                 words.extend(c)
             for t in db['processed_table_toks']:
@@ -48,9 +48,9 @@ if __name__ == '__main__':
     parser.add_argument('--data_paths', nargs='+', type=str, help='input preprocessed dataset file')
     parser.add_argument('--table_path', type=str, default='data/tables.bin', help='preprocessed table file')
     parser.add_argument('--output_path', type=str, required=True, help='output word vocabulary path')
-    parser.add_argument('--reference_file', type=str, default='data/vocab_glove.txt',
-        help='eliminate words not in glove vocabulary, unless occur frequently with mwf > threshold')
-    parser.add_argument('--mwf', default=3, type=int,
+    parser.add_argument('--reference_file', type=str, default='pretrained_models/glove-42b-300d/vocab_glove.txt',
+        help='eliminate word not in glove vocabulary, unless it occurs frequently >= mwf')
+    parser.add_argument('--mwf', default=4, type=int,
         help='minimum word frequency used to pick up frequent words in training dataset, but not in glove vocabulary')
     args = parser.parse_args()
 

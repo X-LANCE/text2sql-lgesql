@@ -9,9 +9,6 @@ from utils.vocab import BOS, Vocab, RELATIVE_POSITION, POS, TYPE_CONTROL
 from utils.word2vec import Word2vecUtils
 from transformers import AutoTokenizer
 
-GRAMMAR_PATH = 'asdl/sql/grammar/sql_asdl_v2.txt'
-TRANS_NAME = 'sql'
-
 def str2idx(s):
     return Example.relative_position_vocab[s]
 
