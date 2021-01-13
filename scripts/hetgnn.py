@@ -50,6 +50,7 @@ else:
         ratio = Example.word2vec.load_embeddings(model.encoder.input_layer.word_embed, Example.word_vocab, device=device)
         logger.info("Init model and word embedding layer with a coverage %.2f" % (ratio))
 # logger.info(str(model))
+torch.save(model.state_dict(), open(os.path.join(exp_path, 'model.bin'), 'wb'))
 
 def decode(choice, output_path, acc_type='sql'):
     assert acc_type in ['beam', 'ast', 'sql'] and choice in ['train', 'dev']

@@ -5,18 +5,6 @@ import stanza
 from nltk.corpus import stopwords
 from itertools import product, combinations
 from utils.constants import MAX_RELATIVE_DIST
-from transformers.tokenization_utils import _is_whitespace, _is_control, _is_punctuation
-
-NLP = stanza.Pipeline('en', processors='tokenize,pos,lemma') #, tokenize_pretokenized=True)
-STOPWORDS = stopwords.words("english")
-
-def is_special_symbol(s):
-    if s.lower() in STOPWORDS:
-        return True
-    elif len(s) == 1:
-        return bool(_is_whitespace(s) | _is_control(s) | _is_punctuation(s))
-    else:
-        return False
 
 def is_number(s):
     try:
@@ -53,6 +41,8 @@ class Preprocessor():
         super(Preprocessor, self).__init__()
         self.db_dir = db_dir
         self.db_content = db_content
+        self.nlp = stanza.Pipeline('en', processors='tokenize,pos,lemma') #, tokenize_pretokenized=True)
+        self.stopwords = stopwords.words("english")
 
     def pipeline(self, entry: dict, db: dict, verbose: bool = False):
         """ db should be preprocessed """
@@ -65,14 +55,14 @@ class Preprocessor():
         """ Tokenize, lemmatize, lowercase table and column names for each database """
         table_toks, table_names = [], []
         for tab in db['table_names']:
-            doc = NLP(tab)
+            doc = self.nlp(tab)
             tab = [w.lemma.lower() for s in doc.sentences for w in s.words]
             table_toks.append(tab)
             table_names.append(" ".join(tab))
         db['processed_table_toks'], db['processed_table_names'] = table_toks, table_names
         column_toks, column_names = [], []
         for _, c in db['column_names']:
-            doc = NLP(c)
+            doc = self.nlp(c)
             c = [w.lemma.lower() for s in doc.sentences for w in s.words]
             column_toks.append(c)
             column_names.append(" ".join(c))
@@ -137,7 +127,7 @@ class Preprocessor():
         """ Tokenize, lemmatize, lowercase question"""
         # stanza tokenize, lemmatize and POS tag
         question = ' '.join(quote_normalization(entry['question_toks']))
-        doc = NLP(question)
+        doc = self.nlp(question)
         raw_toks = [w.text.lower() for s in doc.sentences for w in s.words]
         toks = [w.lemma.lower() for s in doc.sentences for w in s.words]
         pos_tags = [w.xpos for s in doc.sentences for w in s.words]
@@ -264,8 +254,7 @@ class Preprocessor():
         index_pairs = sorted(index_pairs, key=lambda x: x[1] - x[0])
         for i, j in index_pairs:
             phrase = ' '.join(question_toks[i: j])
-            # if skip_special_symbols(phrase): continue
-            if phrase in STOPWORDS: continue
+            if phrase in self.stopwords: continue
             for idx, name in enumerate(table_names):
                 if phrase == name: # fully match will overwrite partial match due to sort
                     q_tab_mat[range(i, j), idx] = 'question-table-exactmatch'
@@ -287,8 +276,7 @@ class Preprocessor():
         index_pairs = sorted(index_pairs, key=lambda x: x[1] - x[0])
         for i, j in index_pairs:
             phrase = ' '.join(question_toks[i: j])
-            # if skip_special_symbols(phrase): continue
-            if phrase in STOPWORDS: continue
+            if phrase in self.stopwords: continue
             for idx, name in enumerate(column_names):
                 if phrase == name: # fully match will overwrite partial match due to sort
                     q_col_mat[range(i, j), idx] = 'question-column-exactmatch'
@@ -321,7 +309,7 @@ class Preprocessor():
                 for j, word in enumerate(raw_question_toks):
                     word = str(float(word)) if is_number(word) else word
                     for c in cell_values:
-                        if word in c and 'nomatch' in q_col_mat[j, i] and word not in STOPWORDS:
+                        if word in c and 'nomatch' in q_col_mat[j, i] and word not in self.stopwords:
                             q_col_mat[j, i] = 'question-column-valuematch'
                             col_q_mat[i, j] = 'column-question-valuematch'
                             if verbose:

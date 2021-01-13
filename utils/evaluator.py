@@ -139,7 +139,7 @@ class Evaluator():
         return float(all_exact_acc)
 
     def sql_acc(self, pred_hyps, dataset, output_path, etype):
-        pred_sqls, ref_sqls = [], [ex['query'] for ex in dataset]
+        pred_sqls, ref_sqls = [], [ex.ex['query'] for ex in dataset]
         dbs = [ex.db for ex in dataset]
         for idx, hyp in enumerate(pred_hyps):
             best_ast = hyp[0].tree # by default, the top beam prediction

@@ -1,9 +1,7 @@
 #coding=utf8
 import numpy as np
 import dgl, torch
-from utils.example import Example
-import scipy as sc
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, block_diag
 
 def sparse2th(mat):
     value = mat.data
@@ -18,12 +16,14 @@ class GraphExample():
 class BatchedGraph():
 
     pass
+
 class GraphFactory():
 
-    def __init__(self, method='lgnn'):
+    def __init__(self, method='lgnn', add_cls=True, relation_vocab=None):
         super(GraphFactory, self).__init__()
         self.method = eval('self.' + method)
         self.batch_method = eval('self.batch_' + method)
+        self.add_cls, self.relation_vocab = add_cls, relation_vocab
 
     def graph_construction(self, ex: dict, db: dict):
         """ Wrapper function """
@@ -39,7 +39,7 @@ class GraphFactory():
         q_s = np.array(ex['schema_linking'][0], dtype='<U100')
         s_q = np.array(ex['schema_linking'][1], dtype='<U100')
         num_nodes = len(ex['processed_question_toks']) + len(db['table_names']) + len(db['column_names'])
-        if Example.add_cls:
+        if self.add_cls:
             cls_cls = np.array(['cls-cls-identity'], dtype='<U100')[np.newaxis, :]
             cls_q = np.array(['cls-question'] * q.shape[0], dtype='<U100')[np.newaxis, :]
             q_cls = np.array(['question-cls'] * q.shape[0], dtype='<U100')[:, np.newaxis]
@@ -63,11 +63,11 @@ class GraphFactory():
             'table-table-fk', 'table-table-fkr', 'table-table-fkb', 'column-column-sametable', 'table-column', 'column-table',
             'table-question-nomatch', 'question-table-nomatch', 'column-question-nomatch', 'question-column-nomatch',
             'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity']
-        edges = [(idx // num_nodes, idx % num_nodes, Example.relation_vocab[r]) for idx, r in enumerate(relation) if r not in filter_relations]
+        edges = [(idx // num_nodes, idx % num_nodes, self.relation_vocab[r]) for idx, r in enumerate(relation) if r not in filter_relations]
         num_edges = len(edges)
         src_ids, dst_ids = list(map(lambda r: r[0], edges)), list(map(lambda r: r[1], edges))
         rel_ids = list(map(lambda r: r[2], edges))
-        
+
         graph = GraphExample()
         graph.g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)
         graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
@@ -75,15 +75,15 @@ class GraphFactory():
         dst_p = coo_matrix(([1.0] * num_edges, (dst_ids, range(num_edges))), shape=(num_nodes, num_edges))
         graph.incidence_matrix = (src_p, dst_p)
         return graph
-    
+
     def batch_lgnn(self, ex_list, device, train=True, **kwargs):
         graph_list = [ex.graph for ex in ex_list]
         bg = BatchedGraph()
         bg.g = dgl.batch([ex.g for ex in graph_list]).to(device)
         bg.lg = bg.g.line_graph(backtracking=False)
         bg.edge_feat = torch.cat([ex.edge_feat for ex in graph_list], dim=0).to(device)
-        src_p = sparse2th(sc.block_diag([ex.incidence_matrix[0] for ex in graph_list])).to(device)
-        dst_p = sparse2th(sc.block_diag([ex.incidence_matrix[1] for ex in graph_list])).to(device)
+        src_p = sparse2th(block_diag([ex.incidence_matrix[0] for ex in graph_list])).to(device)
+        dst_p = sparse2th(block_diag([ex.incidence_matrix[1] for ex in graph_list])).to(device)
         bg.incidence_matrix = (src_p, dst_p)
         return bg
 

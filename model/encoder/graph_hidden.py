@@ -19,23 +19,23 @@ class LineGraphHiddenLayer(nn.Module):
     def forward(self, x, batch):
         """
             x: num_nodes x hidden_size
-            batch.g and batch.lg: dgl graph and its line graph
-            batch.g.incidence_matrix: tuple of num_nodes x num_edges sparse float matrix, src and dst connections
+            batch.graph.g and batch.graph.lg: dgl graph and its line graph
+            batch.graph.incidence_matrix: tuple of num_nodes x num_edges sparse float matrix, src and dst connections
         """
         # prepare inputs
-        lg_x = self.relation_embed(batch.g.edge_feat)
-        g, lg = batch.g.g, batch.g.lg
-        pm, pd = batch.g.incidence_matrix
+        lg_x = self.relation_embed(batch.graph.edge_feat)
+        g, lg = batch.graph.g, batch.graph.lg
+        pm, pd = batch.graph.incidence_matrix
         pmpd = pm + pd
         lg_pmpd = torch.transpose(pmpd, 0, 1)
         # iteration
         for i in range(self.num_layers):
             x, lg_x = self.dropout_layer(x), self.dropout_layer(lg_x)
-            x, lg_x = self.gnn_layers[i](batch.g.g, batch.g.lg, x, lg_x, pmpd, lg_pmpd)
+            x, lg_x = self.gnn_layers[i](g, lg, x, lg_x, pmpd, lg_pmpd)
         return x, lg_x
 
 class LGNNLayer(nn.Module):
-    
+
     def __init__(self, hidden_size, khops=4, num_heads=8, feat_drop=0.2, attn_drop=0.):
         super(LGNNLayer, self).__init__()
         self.node_update_layer = LGNNCore(hidden_size, khops, num_heads, feat_drop, attn_drop)
@@ -51,14 +51,15 @@ class LGNNCore(nn.Module):
     def __init__(self, hidden_size, khops=4, num_heads=8, feat_drop=0.2, attn_drop=0.):
         super(LGNNCore, self).__init__()
         self.hidden_size = hidden_size
+        self.khops = khops
         self.linear_self = nn.Linear(self.hidden_size, self.hidden_size)
         self.linear_khops = nn.ModuleList([nn.Linear(self.hidden_size, self.hidden_size) for _ in range(khops)])
         self.linear_fuse = nn.Linear(self.hidden_size, self.hidden_size)
-        self.feedforward = nn.Sequential([
+        self.feedforward = nn.Sequential(
             nn.Linear(self.hidden_size, self.hidden_size * 4),
             nn.GELU(),
-            nn.Lienar(self.hidden_size *4, self.hidden_size)
-        ])
+            nn.Linear(self.hidden_size *4, self.hidden_size)
+        )
         self.layernorm1 = nn.LayerNorm(self.hidden_size) # intermediate module
         self.layernorm2 = nn.LayerNorm(self.hidden_size) # after feedforward module
         self.dropout_layer = nn.Dropout(p=feat_drop)

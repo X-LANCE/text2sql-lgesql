@@ -161,9 +161,9 @@ class GraphOutputLayer(nn.Module):
                 inputs: sum(q_len + t_len + c_len) x hidden_size
                 outputs: bsize x (max_q_len + max_t_len + max_c_len) x hidden_size
         """
-        outputs = inputs.new_zeros(len(batch), batch.mask_split.size(1), self.hidden_size)
-        outputs = outputs.masked_scatter_(batch.mask_split.unsqueeze(-1), inputs)
-        return outputs, mask_split
+        outputs = inputs.new_zeros(len(batch), batch.mask.size(1), self.hidden_size)
+        outputs = outputs.masked_scatter_(batch.mask.unsqueeze(-1), inputs)
+        return outputs, batch.mask
 
 class BinaryFocalLoss(nn.Module):
 

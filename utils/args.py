@@ -29,6 +29,7 @@ def add_argument_base(arg_parser):
     arg_parser.add_argument('--load_optimizer', action='store_true', default=False, help='Whether to load optimizer state')
     arg_parser.add_argument('--max_epoch', type=int, default=100, help='terminate after maximum epochs')
     arg_parser.add_argument('--max_norm', default=5., type=float, help='clip gradients')
+    return arg_parser
 
 def add_argument_encoder(arg_parser):
     # Encoder Hyperparams

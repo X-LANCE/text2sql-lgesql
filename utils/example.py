@@ -4,7 +4,7 @@ import torch
 import numpy as np
 from asdl.asdl import ASDLGrammar
 from asdl.transition_system import TransitionSystem
-from utils.constants import BOS, UNK, GRAMMAR_PATH, SCHEMA_TYPES, RELATIONS
+from utils.constants import BOS, UNK, GRAMMAR_FILEPATH, SCHEMA_TYPES, RELATIONS
 from utils.graph_utils import GraphFactory
 from utils.vocab import Vocab
 from utils.word2vec import Word2vecUtils
@@ -16,11 +16,10 @@ class Example():
     @classmethod
     def configuration(cls, ptm=None, method='lgnn', table_path='data/tables.bin', add_cls=False):
         cls.ptm = ptm
-        cls.graph_factory = GraphFactory(method)
-        cls.grammar = ASDLGrammar.from_filepath(GRAMMAR_PATH)
+        cls.grammar = ASDLGrammar.from_filepath(GRAMMAR_FILEPATH)
         cls.trans = TransitionSystem.get_class_by_lang('sql')(cls.grammar)
         cls.tables = pickle.load(open(table_path, 'rb'))
-        cls.evaluator = Evaluator(cls.trans, cls.tables)
+        cls.evaluator = Evaluator(cls.trans)
         if ptm is None:
             cls.word2vec = Word2vecUtils()
             cls.tokenizer = lambda x: x
@@ -31,6 +30,7 @@ class Example():
             cls.word_vocab = cls.tokenizer.get_vocab()
         cls.add_cls = add_cls # whether add special CLS node
         cls.relation_vocab = Vocab(padding=False, unk=False, boundary=False, iterable=RELATIONS, default=None)
+        cls.graph_factory = GraphFactory(method, cls.add_cls, cls.relation_vocab)
 
     @classmethod
     def load_dataset(cls, choice, debug=False):
@@ -113,9 +113,9 @@ class Example():
             self.segment_id = [0] * len(self.question_id) + [1] * (len(self.table_id) + len(self.column_id)) \
                 if Example.ptm != 'grappa_large_jnt' and not Example.ptm.startswith('roberta') \
                 else [0] * (len(self.question_id) + len(self.table_id) + len(self.column_id))
-            
+
             # by default, format: [CLS] q1 q2 ... [SEP] t1 t2 ... [SEP] c1 c2 ... [SEP]
-            self.question_id = list(range(len(self.input_id)))
+            self.position_id = list(range(len(self.input_id)))
             # another choice: [CLS] q1 q2 ... [SEP] * [SEP] t1 c1 c2 ... t2 c3 c4 ... [SEP]
             # question_position_id = list(range(len(self.question_id)))
             # start = len(question_position_id)

@@ -149,7 +149,7 @@ class InputRNNLayer(nn.Module):
         columns = columns.split(batch.column_lens.tolist(), dim=0)
         # dgl graph node feats format: q11 q12 ... t11 t12 ... c11 c12 ... q21 q22 ...
         outputs = [th for q_t_c in zip(questions, tables, columns) for th in q_t_c]
-        outputs = torch.cat(th, dim=0)
+        outputs = torch.cat(outputs, dim=0)
         # transformer input format: bsize x max([q1 q2 ... t1 t2 ... c1 c2 ...]) x hidden_size
         # outputs = []
         # for q, t, c in zip(questions, tables, columns):

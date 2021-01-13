@@ -46,7 +46,7 @@ def from_example_list_base(ex_list, device='cpu', train=True):
         batch.inputs = {"input_ids": None, "attention_mask": None, "token_type_ids": None, "position_ids": None}
         input_lens = [len(ex.input_id) for ex in ex_list]
         max_len = max(input_lens)
-        input_ids = [ex.input_id + [pad_idx] * (max_len - len(ex)) for ex in ex_list]
+        input_ids = [ex.input_id + [pad_idx] * (max_len - len(ex.input_id)) for ex in ex_list]
         batch.inputs["input_ids"] = torch.tensor(input_ids, dtype=torch.long, device=device)
         attention_mask = [[1] * l + [0] * (max_len - l) for l in input_lens]
         batch.inputs["attention_mask"] = torch.tensor(attention_mask, dtype=torch.float, device=device)
@@ -134,13 +134,13 @@ class Batch():
     def __getitem__(self, idx):
         return self.examples[idx]
 
-    @cached_property
-    def lens(self):
-        return self.question_lens + self.table_lens + self.column_lens
+    # @cached_property
+    # def lens(self):
+        # return self.question_lens + self.table_lens + self.column_lens
 
-    @cached_property
-    def max_len(self):
-        return torch.max(self.lens).item()
+    # @cached_property
+    # def max_len(self):
+        # return torch.max(self.lens).item()
 
     @cached_property
     def max_question_len(self):
@@ -174,13 +174,13 @@ class Batch():
     def max_column_subword_len(self):
         return torch.max(self.column_subword_lens).item()
 
-    @cached_property
-    def mask(self):
-        return lens2mask(self.lens)
+    # @cached_property
+    # def mask(self):
+        # return lens2mask(self.lens)
 
     """ split means different types of nodes are seperated instead of concatenated together """
     @cached_property
-    def mask_split(self):
+    def mask(self):
         return torch.cat([self.question_mask, self.table_mask, self.column_mask], dim=1)
 
     @cached_property
