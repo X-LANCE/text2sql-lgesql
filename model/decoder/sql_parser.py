@@ -59,11 +59,11 @@ class SqlParser(nn.Module):
         # self.select_table = Attention(args.gnn_hidden_size, args.att_vec_size, dropout=args.dropout, method='dot')
         self.select_table = MultiHeadAttention(args.gnn_hidden_size, args.att_vec_size, dropout=args.dropout, heads=args.num_heads)
 
-    def score(self, encodings, mask, h0, batch, golden=False):
+    def score(self, encodings, mask, h0, batch):
         """ Training function
             @input:
                 encodings: encoded representations and mask matrix from encoder
-                    bsize x seqlen x gnn_hidden_size, seqlen = batch.max_golden_len if golden else batch.max_len
+                    bsize x seqlen x gnn_hidden_size
                 batch: see utils.batch, we use fields
                     batch.table_mappings, batch.column_mappings,
                     batch.examples, batch.get_frontier_prod_idx(t),
@@ -74,8 +74,7 @@ class SqlParser(nn.Module):
         """
         args = self.args
         zero_action_embed = encodings.new_zeros(args.action_embed_size)
-        split_len = [batch.max_question_len, batch.max_table_len, batch.max_column_len] if not golden else \
-            [batch.max_question_len, batch.max_golden_table_len, batch.max_golden_column_len]
+        split_len = [batch.max_question_len, batch.max_table_len, batch.max_column_len]
         q, tab, col = encodings.split(split_len, dim=1)
         q_mask, tab_mask, col_mask = mask.split(split_len, dim=1)
         if args.sep_cxt:
@@ -189,7 +188,7 @@ class SqlParser(nn.Module):
         loss = - torch.stack([torch.stack(logprob_i).sum() for logprob_i in action_probs]).sum()
         return loss
 
-    def parse(self, encodings, mask, h0, batch, beam_size=5, golden=False,
+    def parse(self, encodings, mask, h0, batch, beam_size=5,
             table_mapping=None, column_mapping=None, table_reverse_mapping=None, column_reverse_mapping=None):
         """ Parse one by one, batch size for each args in encodings is 1
         """
@@ -200,8 +199,7 @@ class SqlParser(nn.Module):
         zero_action_embed = encodings.new_zeros(args.action_embed_size)
         assert encodings.size(0) == 1 and mask.size(0) == 1
         encodings, mask = encodings.repeat(beam_size, 1, 1), mask.repeat(beam_size, 1)
-        split_len = [batch.max_question_len, batch.max_table_len, batch.max_column_len] if not golden else \
-            [batch.max_question_len, batch.max_golden_table_len, batch.max_golden_column_len]
+        split_len = [batch.max_question_len, batch.max_table_len, batch.max_column_len]
         q, tab, col = encodings.split(split_len, dim=1)
         q_mask, tab_mask, col_mask = mask.split(split_len, dim=1)
         if args.sep_cxt:

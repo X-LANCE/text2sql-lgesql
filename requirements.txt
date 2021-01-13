@@ -1,3 +1,4 @@
+torch==1.6.0+cu101
 dgl-cu101==0.5.3
 embeddings==0.0.8
 transformers==3.5.1

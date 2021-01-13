@@ -2,15 +2,11 @@
 import argparse
 import sys
 
-def init_args(params=sys.argv[1:], task='ratsql'):
+def init_args(params=sys.argv[1:], task='hetgnn'):
     arg_parser = argparse.ArgumentParser()
     arg_parser = add_argument_base(arg_parser)
-    arg_parser = add_argument_text2sql(arg_parser)
-    if task in ['ratsql_coarse2fine', 'graph_pruning']:
-        arg_parser = add_argument_graph_pruning(arg_parser)
-        arg_parser = add_argument_coarse2fine(arg_parser)
-    if task == 'ratsql_relation_dropout':
-        arg_parser = add_argument_relation_dropout(arg_parser)
+    arg_parser = add_argument_encoder(arg_parser)
+    arg_parser = add_argument_decoder(arg_parser)
     opt = arg_parser.parse_args(params)
     return opt
 
@@ -19,7 +15,6 @@ def add_argument_base(arg_parser):
     arg_parser.add_argument('--task', default='text2sql', help='task name')
     arg_parser.add_argument('--seed', default=999, type=int, help='Random seed')
     arg_parser.add_argument('--device', type=int, default=0, help='Use which device: -1 -> cpu ; the index of gpu o.w.')
-    arg_parser.add_argument('--preprocess', action='store_true', help='whether read examples from preprocessed dataset')
     arg_parser.add_argument('--testing', action='store_true', help='training or evaluation mode')
     arg_parser.add_argument('--read_model_path', type=str, help='read pretrained model path')
     #### Training Hyperparams ####
@@ -34,20 +29,26 @@ def add_argument_base(arg_parser):
     arg_parser.add_argument('--load_optimizer', action='store_true', default=False, help='Whether to load optimizer state')
     arg_parser.add_argument('--max_epoch', type=int, default=100, help='terminate after maximum epochs')
     arg_parser.add_argument('--max_norm', default=5., type=float, help='clip gradients')
-    #### Common Encoder Hyperparams ####
-    arg_parser.add_argument('--ptm', type=str, choices=['bert-base-uncased', 'bert-large-uncased', 'bert-large-uncased-whole-word-masking', 'roberta-base', 'roberta-large', 'electra-base-discriminator', 'electra-large-discriminator'], help='pretrained model name')
-    arg_parser.add_argument('--subword_aggregation', choices=['mean-pooling', 'max-pooling', 'attentive-pooling'], default='mean', help='aggregate subword from PTM')
-    arg_parser.add_argument('--schema_aggregation', choices=['mean-pooling', 'max-pooling', 'attentive-pooling', 'head+tail'], default='head+tail', help='aggregate schema repr')
+
+def add_argument_encoder(arg_parser):
+    # Encoder Hyperparams
+    arg_parser.add_argument('--model', choices=['lgnn', 'rgcn', 'rgat'], default='lgnn', help='which heterogeneous gnn model to use')
+    arg_parser.add_argument('--ptm', type=str, choices=['bert-base-uncased', 'bert-large-uncased', 'bert-large-uncased-whole-word-masking',
+        'roberta-base', 'roberta-large', 'grappa_large_jnt', 'electra-base-discriminator', 'electra-large-discriminator'], help='pretrained model name')
+    arg_parser.add_argument('--add_cls', action='store_true', help='whether add [CLS] node')
+    arg_parser.add_argument('--subword_aggregation', choices=['mean-pooling', 'max-pooling', 'attentive-pooling'], default='attentive-pooling', help='aggregate subword feats from PTM')
+    arg_parser.add_argument('--schema_aggregation', choices=['mean-pooling', 'max-pooling', 'attentive-pooling', 'head+tail'], default='head+tail', help='aggregate schema words feats')
     arg_parser.add_argument('--dropout', type=float, default=0.2, help='feature dropout rate')
-    arg_parser.add_argument('--embed_size', default=300, type=int, help='Size of word embeddings')
+    arg_parser.add_argument('--attn_drop', type=float, default=0., help='dropout rate of attention weights')
+    arg_parser.add_argument('--embed_size', default=300, type=int, help='size of word embeddings, only used in glove.42B.300d')
     arg_parser.add_argument('--gnn_num_layers', default=8, type=int, help='num of GNN layers in encoder')
-    arg_parser.add_argument('--gnn_hidden_size', default=256, type=int, help='Size of GNN layers hidden states')
+    arg_parser.add_argument('--gnn_hidden_size', default=256, type=int, help='size of GNN layers hidden states')
+    arg_parser.add_argument('--khops', default=4, type=int, help='aggregate info from k-hop neighbours')
     arg_parser.add_argument('--num_heads', default=8, type=int, help='num of heads in multihead attn')
-    arg_parser.add_argument('--attn_drop', type=float, default=0., help='attn dropout rate in GAT encoding module')
     return arg_parser
 
-def add_argument_text2sql(arg_parser):
-    # decoder hyperparams
+def add_argument_decoder(arg_parser):
+    # Decoder Hyperparams
     arg_parser.add_argument('--lstm', choices=['lstm', 'onlstm'], default='onlstm', help='Type of LSTM used, ONLSTM or traditional LSTM')
     arg_parser.add_argument('--chunk_size', default=8, type=int, help='parameter of ONLSTM')
     arg_parser.add_argument('--att_vec_size', default=512, type=int, help='size of attentional vector')
@@ -70,29 +71,4 @@ def add_argument_text2sql(arg_parser):
                             help='Do not use the parent hidden state to update decoder LSTM state')
     arg_parser.add_argument('--beam_size', default=5, type=int, help='Beam size for beam search')
     arg_parser.add_argument('--decode_max_step', default=100, type=int, help='Maximum number of time steps used in decoding')
-    return arg_parser
-
-def add_argument_coarse2fine(arg_parser):
-    arg_parser.add_argument('--prune', action='store_true', help='whether pruning the full schema graph for second pass encoding or decoding')
-    arg_parser.add_argument('--prune_coeffi', type=float, default=1.0, help='coefficient for pruning loss')
-    arg_parser.add_argument('--shared_num_layers', type=int, default=8, help='the bottom layers are shared for pruning and end2end encoding')
-    arg_parser.add_argument('--min_rate', type=float, default=.05, help='minimum sampling rate for irrelevant schema items during text2sql decoding')
-    arg_parser.add_argument('--max_rate', type=float, default=1., help='maximum sampling rate for irrelevant schema items during text2sql decoding')
-    return arg_parser
-
-def add_argument_graph_pruning(arg_parser):
-    arg_parser.add_argument('--question_pooling_method', default='multihead-attention', choices=['max-pooling', 'mean-pooling', 'attentive-pooling', 'multihead-attention'], help='method to aggregate the representation for the question sequence')
-    arg_parser.add_argument('--score_function', default='biaffine', choices=['dot', 'bilinear', 'affine', 'biaffine'], help='score function to calculate similarity score given two vectors')
-    arg_parser.add_argument('--dim_reduction', default=4, type=int, help='perform dim reduction before score function')
-    arg_parser.add_argument('--loss_function', default='bce', choices=['bce', 'focal'], help='binary loss function used to calculate loss')
-    arg_parser.add_argument('--label_smoothing', default=0.15, type=float, help='label smoothing factor used for binary cross entropy loss, 0 =< ls < 0.5')
-    arg_parser.add_argument('--pos_weight', default=1.0, type=float, help='weight for positive labels')
-    arg_parser.add_argument('--alpha', default=0.8, type=float, help='parameter for data imbalance')
-    arg_parser.add_argument('--gamma', default=0.5, type=float, help='parameter for kaiming focal loss function')
-    return arg_parser
-
-def add_argument_relation_dropout(arg_parser):
-    arg_parser.add_argument('--relation_dropout', type=float, default=0.2, help='relation dropout rate, as data augmentation')
-    arg_parser.add_argument('--relation_dropout_pattern', default='cross', choices=['all', 'cross'], help='drop which area in the adjacency matrix: all area or only the schema linking rectangle')
-    arg_parser.add_argument('--relation_dropout_method', default='linear', choices=['constant', 'linear'], help='how to change the dropout ratio')
     return arg_parser

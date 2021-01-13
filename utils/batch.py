@@ -69,10 +69,10 @@ def from_example_list_base(ex_list, device='cpu', train=True):
         column_subword_lens = [l for ex in ex_list for l in ex.column_subword_len]
         batch.column_subword_lens = torch.tensor(column_subword_lens, dtype=torch.long, device=device)
 
+    batch.question_unk_mask, batch.table_unk_mask, batch.column_unk_mask = None, None, None
     if not train and ptm is None:
         # during evaluation, for words not in vocab but in glove vocab, extract its correpsonding embedding
         word2vec, unk_idx = Example.word2vec, Example.word_vocab[UNK]
-        batch.question_unk_mask, batch.table_unk_mask, batch.column_unk_mask = None, None, None
 
         question_unk_mask = (batch.questions == unk_idx).cpu()
         if question_unk_mask.any().item():
@@ -103,8 +103,6 @@ def from_example_list_base(ex_list, device='cpu', train=True):
             if oov_flag.any().item():
                 batch.column_unk_mask = column_unk_mask.masked_scatter_(torch.clone(column_unk_mask), oov_flag).to(device)
                 batch.column_unk_embeddings = torch.tensor([e for e in unk_word_embeddings if e is not None], dtype=torch.float, device=device)
-    else:
-        batch.question_unk_mask, batch.table_unk_mask, batch.column_unk_mask = None, None, None
     return batch
 
 def from_example_list_hetgnn(ex_list, device='cpu', train=True, **kwargs):

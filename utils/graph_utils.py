@@ -70,7 +70,7 @@ class GraphFactory():
         
         graph = GraphExample()
         graph.g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)
-        graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long).unsqueeze(1)
+        graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
         src_p = coo_matrix(([1.0] * num_edges, (src_ids, range(num_edges))), shape=(num_nodes, num_edges))
         dst_p = coo_matrix(([1.0] * num_edges, (dst_ids, range(num_edges))), shape=(num_nodes, num_edges))
         graph.incidence_matrix = (src_p, dst_p)

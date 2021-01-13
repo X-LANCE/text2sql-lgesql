@@ -28,9 +28,9 @@ logger.info("Use GPU with index %s" % (args.device) if args.device >= 0 else "Us
 start_time = time.time()
 if args.read_model_path:
     params = json.load(open(os.path.join(args.read_model_path, 'params.json')), object_hook=lambda d: Namespace(**d))
-    args.ptm, args.model, args.lazy_load = params.ptm, params.model, True
+    args.ptm, args.model, args.add_cls, args.lazy_load = params.ptm, params.model, params.add_cls, True
 # set up the grammar, transition system, evaluator, etc.
-Example.configuration(ptm=args.ptm, method=args.model, add_cls=True)
+Example.configuration(ptm=args.ptm, method=args.model, add_cls=args.add_cls)
 train_dataset, dev_dataset = Example.load_dataset('train'), Example.load_dataset('dev')
 logger.info("Load dataset and database finished, cost %.4fs ..." % (time.time() - start_time))
 logger.info("Dataset size: train -> %d ; dev -> %d" % (len(train_dataset), len(dev_dataset)))
@@ -39,23 +39,17 @@ args.word_vocab, args.relation_num = len(Example.word_vocab), len(Example.relati
 
 # model init, set optimizer
 if args.read_model_path:
-    model = Registrable.by_name(args.method)(params, sql_trans).to(device)
+    model = Registrable.by_name('hetgnn-sql')(params, sql_trans).to(device)
     check_point = torch.load(open(os.path.join(args.read_model_path, 'model.bin'), 'rb'))
     model.load_state_dict(check_point['model'])
     logger.info("Load saved model from path: %s" % (args.read_model_path))
 else:
     json.dump(vars(args), open(os.path.join(exp_path, 'params.json'), 'w'), indent=4)
-    model = Registrable.by_name(args.method)(args, sql_trans).to(device)
+    model = Registrable.by_name('hetgnn-sql')(args, sql_trans).to(device)
     if args.ptm is None:
         ratio = Example.word2vec.load_embeddings(model.encoder.input_layer.word_embed, Example.word_vocab, device=device)
         logger.info("Init model and word embedding layer with a coverage %.2f" % (ratio))
 # logger.info(str(model))
-num_training_steps = ((len(train_dataset) + args.batch_size - 1) // args.batch_size) * args.max_epoch
-num_warmup_steps = int(num_training_steps * args.warmup_ratio)
-logger.info('Total training steps: %d;\t Warmup steps: %d' % (num_training_steps, num_warmup_steps))
-optimizer, scheduler = set_optimizer(model, args, num_warmup_steps, num_training_steps)
-if args.read_model_path and args.load_optimizer:
-    optimizer.load_state_dict(check_point['optim'])
 
 def decode(choice, output_path, acc_type='sql'):
     assert acc_type in ['beam', 'ast', 'sql'] and choice in ['train', 'dev']
@@ -73,6 +67,12 @@ def decode(choice, output_path, acc_type='sql'):
     return acc
 
 if not args.testing:
+    num_training_steps = ((len(train_dataset) + args.batch_size - 1) // args.batch_size) * args.max_epoch
+    num_warmup_steps = int(num_training_steps * args.warmup_ratio)
+    logger.info('Total training steps: %d;\t Warmup steps: %d' % (num_training_steps, num_warmup_steps))
+    optimizer, scheduler = set_optimizer(model, args, num_warmup_steps, num_training_steps)
+    if args.read_model_path and args.load_optimizer:
+        optimizer.load_state_dict(check_point['optim'])
     nsamples, best_result = len(train_dataset), {'dev_acc': 0.}
     train_index, step_size = np.arange(nsamples), args.batch_size // args.grad_accumulate
     logger.info('Start training ......')

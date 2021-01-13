@@ -1,133 +1,96 @@
 #coding=utf8
 import copy, math
-import torch
+import torch, dgl
+import dgl.function as fn
 import torch.nn as nn
 import torch.nn.functional as F
-from model.model_utils import clones
 
-class RATSQLGraphHiddenLayer(nn.Module):
+class LineGraphHiddenLayer(nn.Module):
 
-    def __init__(self, hidden_size, relation_num, num_heads, num_layers=2, feat_drop=0., attn_drop=0., share_layers=True, share_heads=True, layerwise_relation=False):
-        super(RATSQLGraphHiddenLayer, self).__init__()
+    def __init__(self, hidden_size, relation_num, khops=4, num_layers=8, num_heads=8, feat_drop=0.2, attn_drop=0.):
+        super(LineGraphHiddenLayer, self).__init__()
         self.num_layers = num_layers
-        self.share_layers, self.share_heads = share_layers, share_heads
-        if self.share_layers:
-            if self.share_heads:
-                self.relation_embed_k = nn.Embedding(relation_num, hidden_size // num_heads, padding_idx=0)
-                self.relation_embed_v = nn.Embedding(relation_num, hidden_size // num_heads, padding_idx=0)
-            else:
-                self.relation_embed_k = nn.Embedding(relation_num, hidden_size, padding_idx=0)
-                self.relation_embed_v = nn.Embedding(relation_num, hidden_size, padding_idx=0)
-        else:
-            self.relation_embed_k, self.relation_embed_v = None, None
-        gnn_module = RATSQLGraphIterataionLayer(hidden_size, relation_num, num_heads, feat_drop=feat_drop, attn_drop=attn_drop, share_layers=share_layers, share_heads=share_heads, layerwise_relation=layerwise_relation)
-        self.gnn_layers = clones(gnn_module, self.num_layers)
+        self.relation_embed = nn.Embedding(relation_num, hidden_size)
+        self.gnn_layers = nn.ModuleList([LGNNLayer(
+            hidden_size, khops=khops, num_heads=num_heads, feat_drop=feat_drop, attn_drop=attn_drop
+        ) for _ in range(self.num_layers)])
+        self.dropout_layer = nn.Dropout(p=feat_drop)
 
-    def pad_embedding_grad_zero(self):
-        if self.relation_embed_k is None:
-            for i in range(self.num_layers):
-                self.gnn_layers[i].relation_embed_k.weight.grad[0].zero_()
-                self.gnn_layers[i].relation_embed_v.weight.grad[0].zero_()
-        else:
-            self.relation_embed_k.weight.grad[0].zero_()
-            self.relation_embed_v.weight.grad[0].zero_()
-
-    def forward(self, inputs, relations, relations_mask):
+    def forward(self, x, batch):
+        """
+            x: num_nodes x hidden_size
+            batch.g and batch.lg: dgl graph and its line graph
+            batch.g.incidence_matrix: tuple of num_nodes x num_edges sparse float matrix, src and dst connections
+        """
+        # prepare inputs
+        lg_x = self.relation_embed(batch.g.edge_feat)
+        g, lg = batch.g.g, batch.g.lg
+        pm, pd = batch.g.incidence_matrix
+        pmpd = pm + pd
+        lg_pmpd = torch.transpose(pmpd, 0, 1)
+        # iteration
         for i in range(self.num_layers):
-            inputs = self.gnn_layers[i](inputs, relations, relations_mask, self.relation_embed_k, self.relation_embed_v)
-        return inputs
+            x, lg_x = self.dropout_layer(x), self.dropout_layer(lg_x)
+            x, lg_x = self.gnn_layers[i](batch.g.g, batch.g.lg, x, lg_x, pmpd, lg_pmpd)
+        return x, lg_x
 
-class RATSQLGraphIterataionLayer(nn.Module):
+class LGNNLayer(nn.Module):
+    
+    def __init__(self, hidden_size, khops=4, num_heads=8, feat_drop=0.2, attn_drop=0.):
+        super(LGNNLayer, self).__init__()
+        self.node_update_layer = LGNNCore(hidden_size, khops, num_heads, feat_drop, attn_drop)
+        self.edge_update_layer = LGNNCore(hidden_size, khops, num_heads, feat_drop, attn_drop)
 
-    def __init__(self, hidden_size, relation_num, num_heads, feedforward=1024, feat_drop=0., attn_drop=0., share_layers=True, share_heads=True, layerwise_relation=False):
-        super(RATSQLGraphIterataionLayer, self).__init__()
-        assert hidden_size % num_heads == 0, 'Hidden size is not divisible by num of heads'
+    def forward(self, g, lg, x, lg_x, pmpd, lg_pmpd):
+        next_x = self.node_update_layer(g, x, lg_x, pmpd)
+        next_lg_x = self.edge_update_layer(lg, lg_x, x, lg_pmpd)
+        return next_x, next_lg_x
+
+class LGNNCore(nn.Module):
+
+    def __init__(self, hidden_size, khops=4, num_heads=8, feat_drop=0.2, attn_drop=0.):
+        super(LGNNCore, self).__init__()
         self.hidden_size = hidden_size
-        self.relation_num = relation_num
-        self.num_heads = num_heads
-        self.query = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
-        self.key = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
-        self.value = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
-        self.concat_affine = nn.Linear(self.hidden_size, self.hidden_size, bias=True)
-        self.feedforward = nn.Sequential(
-            nn.Linear(self.hidden_size, feedforward),
-            # GELU(),
-            nn.ReLU(inplace=True),
-            nn.Linear(feedforward, self.hidden_size)
-        )
-        self.layer_norm_1 = nn.LayerNorm(self.hidden_size)
-        self.layer_norm_2 = nn.LayerNorm(self.hidden_size)
-        self.share_layers, self.share_heads = share_layers, share_heads
-        if not self.share_layers:
-            if self.share_heads:
-                self.relation_embed_k = nn.Embedding(self.relation_num, self.hidden_size // self.num_heads, padding_idx=0)
-                self.relation_embed_v = nn.Embedding(self.relation_num, self.hidden_size // self.num_heads, padding_idx=0)
-            else:
-                self.relation_embed_k = nn.Embedding(self.relation_num, self.hidden_size, padding_idx=0)
-                self.relation_embed_v = nn.Embedding(self.relation_num, self.hidden_size, padding_idx=0)
-        else:
-            self.relation_embed_k, self.relation_embed_v = None, None
-        self.layerwise_relation = layerwise_relation
-        if self.layerwise_relation:
-            assert self.share_layers, 'If we use layerwise relation, initial edge features must be shared across different layers.'
-        input_dim = self.hidden_size // self.num_heads if self.share_heads else self.hidden_size
-        self.relation_affine_k = nn.Linear(input_dim, input_dim, bias=False) if self.layerwise_relation else lambda x: x
-        self.relation_affine_v = nn.Linear(input_dim, input_dim, bias=False) if self.layerwise_relation else lambda x: x
+        self.linear_self = nn.Linear(self.hidden_size, self.hidden_size)
+        self.linear_khops = nn.ModuleList([nn.Linear(self.hidden_size, self.hidden_size) for _ in range(khops)])
+        self.linear_fuse = nn.Linear(self.hidden_size, self.hidden_size)
+        self.feedforward = nn.Sequential([
+            nn.Linear(self.hidden_size, self.hidden_size * 4),
+            nn.GELU(),
+            nn.Lienar(self.hidden_size *4, self.hidden_size)
+        ])
+        self.layernorm1 = nn.LayerNorm(self.hidden_size) # intermediate module
+        self.layernorm2 = nn.LayerNorm(self.hidden_size) # after feedforward module
         self.dropout_layer = nn.Dropout(p=feat_drop)
         self.attndrop_layer = nn.Dropout(p=attn_drop)
 
-    def forward(self, inputs, relations, relations_mask, relation_embed_k=None, relation_embed_v=None):
-        bsize, seqlen = inputs.size(0), inputs.size(1)
-        # bsize x num_heads x seqlen x 1 x dim
-        q = self.query(self.dropout_layer(inputs)).view(bsize, seqlen, self.num_heads, -1).transpose(1, 2).unsqueeze(3)
-        # bsize x num_heads x seqlen x seqlen x dim
-        k = self.key(self.dropout_layer(inputs)).view(bsize, seqlen, self.num_heads, -1).\
-            transpose(1, 2).unsqueeze(2).expand(bsize, self.num_heads, seqlen, seqlen, -1)
-        v = self.value(self.dropout_layer(inputs)).view(bsize, seqlen, self.num_heads, -1).\
-            transpose(1, 2).unsqueeze(2).expand(bsize, self.num_heads, seqlen, seqlen, -1)
-        # bsize x num_heads x seqlen x seqlen x dim
-        if not self.share_layers:
-            relation_embed_k, relation_embed_v = self.relation_embed_k, self.relation_embed_v
-        if self.share_heads:
-            relation_k = self.relation_affine_k(relation_embed_k(relations)).unsqueeze(1).expand(-1, self.num_heads, -1, -1, -1)
-            relation_v = self.relation_affine_v(relation_embed_v(relations)).unsqueeze(1).expand(-1, self.num_heads, -1, -1, -1)
-        else:
-            relation_k = self.relation_affine_k(relation_embed_k(relations)).view(bsize, seqlen, seqlen, self.num_heads, -1).permute(0, 3, 1, 2, 4)
-            relation_v = self.relation_affine_v(relation_embed_v(relations)).view(bsize, seqlen, seqlen, self.num_heads, -1).permute(0, 3, 1, 2, 4)
-        k = k + relation_k
-        v = v + relation_v
-        # e: bsize x heads x seqlen x seqlen
-        scale_factor = math.sqrt(self.hidden_size // self.num_heads)
-        e = (torch.matmul(q, k.transpose(-1, -2)) / scale_factor).squeeze(-2)
-        e = e + (relations_mask.float() * (-1e20)).unsqueeze(1) # mask no-relation
-        a = torch.softmax(e, dim=-1)
-        a = self.attndrop_layer(a)
-        outputs = torch.matmul(a.unsqueeze(-2), v).squeeze(-2)
-        outputs = outputs.transpose(1, 2).contiguous().view(bsize, seqlen, -1)
-        outputs = self.concat_affine(outputs)
-        outputs = self.layer_norm_1(inputs + outputs)
-        outputs = self.layer_norm_2(outputs + self.feedforward(outputs))
+    def forward(self, g, x, lg_x, pmpd):
+        """ @Params:
+            g: dgl.graph obj
+            x: node feats
+            lg_x: edge feats
+            pmpd: incidence matrix, sparse FloatTensor, num_nodes x num_edges
+        """
+        prev_x = self.linear_self(x)
+        khops_x = aggregate_neighbours(self.khops, g, x)
+        khops_x = sum([linear(x) for linear, x in zip(self.linear_khops, khops_x)])
+        edge_x = self.linear_fuse(torch.mm(pmpd, lg_x))
+        outputs = F.gelu(prev_x + khops_x + edge_x)
+        # feedforward module
+        outputs = self.layernorm1(x + outputs)
+        outputs = self.layernorm2(outputs + self.feedforward(outputs))
         return outputs
 
-class GELU(nn.Module):
-    r"""Applies the Gaussian Error Linear Units function:
-
-    .. math:: \text{GELU}(x) = x * \Phi(x)
-
-    where :math:`\Phi(x)` is the Cumulative Distribution Function for Gaussian Distribution.
-
-    Shape:
-        - Input: :math:`(N, *)` where `*` means, any number of additional
-          dimensions
-        - Output: :math:`(N, *)`, same shape as the input
-
-    .. image:: ../scripts/activation_images/GELU.png
-
-    Examples::
-
-        >>> m = nn.GELU()
-        >>> input = torch.randn(2)
-        >>> output = m(input)
-    """
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
-        return F.gelu(input)
+def aggregate_neighbours(k, g, z):
+    # initializing list to collect message passing result
+    z_list = []
+    with g.local_scope():
+        g.ndata['z'] = z
+        # pulling message from 1-hop neighbourhood
+        g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+        z_list.append(g.ndata['z'])
+        for i in range(k - 1):
+            # pulling message from k-hop neighborhood
+            g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+            z_list.append(g.ndata['z'])
+    return z_list
