@@ -24,7 +24,7 @@ class Example():
             cls.word2vec = Word2vecUtils()
             cls.tokenizer = lambda x: x
             cls.word_vocab = Vocab(padding=True, unk=True, boundary=True, default=UNK,
-                file_path='./pretrained_models/glove-42b-300d/vocab.txt', specials=SCHEMA_TYPES) # word vocab for glove.42B.300d
+                filepath='./pretrained_models/glove-42b-300d/vocab.txt', specials=SCHEMA_TYPES) # word vocab for glove.42B.300d
         else:
             cls.tokenizer = AutoTokenizer.from_pretrained(os.path.join('./pretrained_models', ptm))
             cls.word_vocab = cls.tokenizer.get_vocab()
