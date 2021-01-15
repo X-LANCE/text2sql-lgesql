@@ -96,8 +96,9 @@ class Preprocessor():
         if len(db['foreign_keys']) > 0:
             col1, col2 = list(zip(*db['foreign_keys']))
             col_mat[col1, col2], col_mat[col2, col1] = 'column-column-fk', 'column-column-fkr'
-        # col_mat[0, list(range(c_num))] = '*-column'
-        # col_mat[list(range(c_num)), 0] = 'column-*'
+        col_mat[0, 0] = '*-*-identity'
+        col_mat[0, list(range(c_num))] = '*-column'
+        col_mat[list(range(c_num)), 0] = 'column-*'
 
         # relations between tables and columns, t_num*c_num and c_num*t_num
         tab_col_mat = np.array([['table-column'] * c_num for _ in range(t_num)], dtype=dtype)
@@ -107,8 +108,8 @@ class Preprocessor():
         if len(db['primary_keys']) > 0:
             cols, tabs = list(zip(*list(map(lambda x: (x, column2table[x]), db['primary_keys']))))
             col_tab_mat[cols, tabs], tab_col_mat[tabs, cols] = 'column-table-pk', 'table-column-pk'
-        # col_tab_mat[0, list(range(t_num))] = '*-table'
-        # tab_col_mat[list(range(t_num)), 0] = 'table-*'
+        col_tab_mat[0, list(range(t_num))] = '*-table'
+        tab_col_mat[list(range(t_num)), 0] = 'table-*'
 
         relations = np.concatenate([
             np.concatenate([tab_mat, tab_col_mat], axis=1),
@@ -318,6 +319,8 @@ class Preprocessor():
             conn.close()
 
         # two symmetric schema linking matrix: q_num x (t_num + c_num), (t_num + c_num) x q_num
+        q_col_mat[:, 0] = 'question-*'
+        col_q_mat[0] = '*-question'
         q_schema = np.concatenate([q_tab_mat, q_col_mat], axis=1)
         schema_q = np.concatenate([tab_q_mat, col_q_mat], axis=0)
         entry['schema_linking'] = (q_schema.tolist(), schema_q.tolist())

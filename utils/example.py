@@ -142,5 +142,6 @@ class Example():
 
         # outputs
         self.ast = ex['ast']
+        self.query = ' '.join(ex['query'].split('\t'))
         self.tgt_action = ex['actions']
         self.used_tables, self.used_columns = ex['used_tables'], ex['used_columns']

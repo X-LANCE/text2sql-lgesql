@@ -41,7 +41,8 @@ args.word_vocab, args.relation_num = len(Example.word_vocab), len(Example.relati
 if args.read_model_path:
     model = Registrable.by_name('hetgnn-sql')(params, sql_trans).to(device)
     check_point = torch.load(open(os.path.join(args.read_model_path, 'model.bin'), 'rb'))
-    model.load_state_dict(check_point['model'])
+    # model.load_state_dict(check_point['model'])
+    model.load_state_dict(check_point)
     logger.info("Load saved model from path: %s" % (args.read_model_path))
 else:
     json.dump(vars(args), open(os.path.join(exp_path, 'params.json'), 'w'), indent=4)
@@ -50,7 +51,6 @@ else:
         ratio = Example.word2vec.load_embeddings(model.encoder.input_layer.word_embed, Example.word_vocab, device=device)
         logger.info("Init model and word embedding layer with a coverage %.2f" % (ratio))
 # logger.info(str(model))
-torch.save(model.state_dict(), open(os.path.join(exp_path, 'model.bin'), 'wb'))
 
 def decode(choice, output_path, acc_type='sql'):
     assert acc_type in ['beam', 'ast', 'sql'] and choice in ['train', 'dev']
@@ -123,6 +123,8 @@ if not args.testing:
 else:
     start_time = time.time()
     train_acc = decode('train', output_path=os.path.join(args.read_model_path, 'train.eval'), acc_type='sql')
+    logger.info("Evaluation costs %.2fs ; Train dataset exact match acc is %.4f ." % (time.time() - start_time, train_acc))
+    start_time = time.time()
     dev_acc = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval'), acc_type='sql')
     dev_acc_beam = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval.beam' + str(args.beam_size)), acc_type='beam')
     logger.info("Evaluation costs %.2fs ; Dev dataset exact match/inner beam acc is %.4f/%.4f ." % (time.time() - start_time, dev_acc, dev_acc_beam))

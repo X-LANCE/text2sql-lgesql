@@ -1,11 +1,11 @@
-task=lgnn_glove_remove_nomatch
+task=lgnn_debug
 seed=999
 device=0
-testing='' #'--testing'
-read_model_path=''
+testing='--testing' #'--testing'
+read_model_path='--read_model_path exp/lgnn_debug/lgnn__emb_300__gnn_256_x_8__hop_4__head_8__dp_0.2__dpa_0.0__dpc_0.2__bsize_20__lr_0.0005__l2_0.0001__warmup_0.1__schedule_linear__me_100__mn_5.0__beam_5/'
 
 model=lgnn
-add_cls='--add_cls'
+add_cls=''
 ptm=''
 embed_size=300
 subword_aggregation=attentive-pooling

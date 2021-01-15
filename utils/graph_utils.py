@@ -79,8 +79,16 @@ class GraphFactory():
     def batch_lgnn(self, ex_list, device, train=True, **kwargs):
         graph_list = [ex.graph for ex in ex_list]
         bg = BatchedGraph()
-        bg.g = dgl.batch([ex.g for ex in graph_list]).to(device)
-        bg.lg = bg.g.line_graph(backtracking=False)
+        # g = dgl.batch([ex.g for ex in graph_list]).to(device)
+        # bg.g = (g, dgl.khop_graph(g, 2).to(device), dgl.khop_graph(g, 3).to(device), dgl.khop_graph(g, 4).to(device))
+        # lg = g.line_graph(backtracking=False)
+        # bg.lg = (lg, dgl.khop_graph(lg, 2).to(device), dgl.khop_graph(lg, 3).to(device), dgl.khop_graph(lg, 4).to(device))
+        g = dgl.batch([ex.g for ex in graph_list])
+        bg.g = (g.add_self_loop().to(device), dgl.khop_graph(g, 2).add_self_loop().to(device),
+            dgl.khop_graph(g, 3).add_self_loop().to(device), dgl.khop_graph(g, 4).add_self_loop().to(device))
+        lg = g.line_graph(backtracking=False)
+        bg.lg = (lg.add_self_loop().to(device), dgl.khop_graph(lg, 2).add_self_loop().to(device),
+            dgl.khop_graph(lg, 3).add_self_loop().to(device), dgl.khop_graph(lg, 4).add_self_loop().to(device))
         bg.edge_feat = torch.cat([ex.edge_feat for ex in graph_list], dim=0).to(device)
         src_p = sparse2th(block_diag([ex.incidence_matrix[0] for ex in graph_list])).to(device)
         dst_p = sparse2th(block_diag([ex.incidence_matrix[1] for ex in graph_list])).to(device)

@@ -30,7 +30,7 @@ class Evaluator():
         for each in ['easy', 'medium', 'hard', 'extra', 'all']:
             scores[each] = [0, 0.] # first is count, second is total score
         for idx, pred in enumerate(pred_hyps):
-            question, gold_sql, db = dataset[idx].ex['question'], dataset[idx].ex['query'], dataset[idx].db
+            question, gold_sql, db = dataset[idx].ex['question'], dataset[idx].query, dataset[idx].db
             for b_id, hyp in enumerate(pred):
                 pred_sql = self.transition_system.ast_to_surface_code(hyp.tree, db)
                 score, hardness = self.single_acc(pred_sql, gold_sql, db['db_id'], etype)
@@ -139,7 +139,7 @@ class Evaluator():
         return float(all_exact_acc)
 
     def sql_acc(self, pred_hyps, dataset, output_path, etype):
-        pred_sqls, ref_sqls = [], [ex.ex['query'] for ex in dataset]
+        pred_sqls, ref_sqls = [], [ex.query for ex in dataset]
         dbs = [ex.db for ex in dataset]
         for idx, hyp in enumerate(pred_hyps):
             best_ast = hyp[0].tree # by default, the top beam prediction

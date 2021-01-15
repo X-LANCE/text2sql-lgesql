@@ -2,6 +2,7 @@
 import copy, math
 import torch, dgl
 import dgl.function as fn
+from dgl.nn.pytorch.conv import GATConv
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -52,12 +53,12 @@ class LGNNCore(nn.Module):
         super(LGNNCore, self).__init__()
         self.hidden_size = hidden_size
         self.khops = khops
-        self.linear_self = nn.Linear(self.hidden_size, self.hidden_size)
-        self.linear_khops = nn.ModuleList([nn.Linear(self.hidden_size, self.hidden_size) for _ in range(khops)])
-        self.linear_fuse = nn.Linear(self.hidden_size, self.hidden_size)
+        # self.linear_khops = nn.ModuleList([nn.Linear(self.hidden_size, self.hidden_size // khops) for _ in range(khops)])
+        self.gat_khops = nn.ModuleList([GATConv(self.hidden_size, self.hidden_size // khops, 1) for _ in range(khops)])
+        self.linear_fuse = nn.Linear(self.hidden_size * 2, self.hidden_size)
         self.feedforward = nn.Sequential(
             nn.Linear(self.hidden_size, self.hidden_size * 4),
-            nn.GELU(),
+            nn.ReLU(),
             nn.Linear(self.hidden_size *4, self.hidden_size)
         )
         self.layernorm1 = nn.LayerNorm(self.hidden_size) # intermediate module
@@ -72,26 +73,33 @@ class LGNNCore(nn.Module):
             lg_x: edge feats
             pmpd: incidence matrix, sparse FloatTensor, num_nodes x num_edges
         """
-        prev_x = self.linear_self(x)
-        khops_x = aggregate_neighbours(self.khops, g, x)
-        khops_x = sum([linear(x) for linear, x in zip(self.linear_khops, khops_x)])
-        edge_x = self.linear_fuse(torch.mm(pmpd, lg_x))
-        outputs = F.gelu(prev_x + khops_x + edge_x)
+        # khops_x = aggregate_neighbours(self.khops, g, x)
+        # khops_x = [linear(x) for linear, x in zip(self.linear_khops, khops_x)]
+        khops_x = [gat(tmp_g, x).squeeze(1) for gat, tmp_g in zip(self.gat_khops, g)]
+        outputs = torch.cat(khops_x, dim=-1)
+        edge_x = torch.mm(pmpd, lg_x)
+        fuse_x = self.linear_fuse(torch.cat([outputs, edge_x], dim=-1))
+        outputs = self.layernorm1(x + fuse_x)
         # feedforward module
-        outputs = self.layernorm1(x + outputs)
         outputs = self.layernorm2(outputs + self.feedforward(outputs))
         return outputs
 
 def aggregate_neighbours(k, g, z):
     # initializing list to collect message passing result
     z_list = []
-    with g.local_scope():
-        g.ndata['z'] = z
+    for i in range(k):
+        tmp_g = g[i]
+        with tmp_g.local_scope():
+            tmp_g.ndata['z'] = z
+            tmp_g.update_all(fn.copy_src(src='z', out='m'), fn.mean(msg='m', out='z'))
+            z_list.append(tmp_g.ndata['z'])
+    # with g.local_scope():
+        # g.ndata['z'] = z
         # pulling message from 1-hop neighbourhood
-        g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
-        z_list.append(g.ndata['z'])
-        for i in range(k - 1):
+        # g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+        # z_list.append(g.ndata['z'])
+        # for i in range(k - 1):
             # pulling message from k-hop neighborhood
-            g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
-            z_list.append(g.ndata['z'])
+            # g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+            # z_list.append(g.ndata['z'])
     return z_list
