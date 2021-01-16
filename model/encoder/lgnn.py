@@ -5,17 +5,19 @@ import dgl.function as fn
 from dgl.nn.pytorch.conv import GATConv
 import torch.nn as nn
 import torch.nn.functional as F
+from model.model_utils import Registrable
 
-class LineGraphHiddenLayer(nn.Module):
+@Registrable.register('hetgnn')
+class LGNN(nn.Module):
 
-    def __init__(self, hidden_size, relation_num, khops=4, num_layers=8, num_heads=8, feat_drop=0.2, attn_drop=0.):
-        super(LineGraphHiddenLayer, self).__init__()
-        self.num_layers = num_layers
-        self.relation_embed = nn.Embedding(relation_num, hidden_size)
+    def __init__(self, args):
+        super(LGNN, self).__init__()
+        self.num_layers = args.gnn_num_layers
+        self.relation_embed = nn.Embedding(args.relation_num, args.hidden_size)
         self.gnn_layers = nn.ModuleList([LGNNLayer(
-            hidden_size, khops=khops, num_heads=num_heads, feat_drop=feat_drop, attn_drop=attn_drop
+            args.hidden_size, khops=args.khops, num_heads=args.num_heads, feat_drop=args.dropout, attn_drop=args.attn_drop
         ) for _ in range(self.num_layers)])
-        self.dropout_layer = nn.Dropout(p=feat_drop)
+        self.dropout_layer = nn.Dropout(p=args.dropout)
 
     def forward(self, x, batch):
         """
@@ -103,3 +105,4 @@ def aggregate_neighbours(k, g, z):
             # g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
             # z_list.append(g.ndata['z'])
     return z_list
+       

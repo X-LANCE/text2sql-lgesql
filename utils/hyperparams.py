@@ -3,13 +3,10 @@ import sys, os
 
 EXP_PATH = 'exp'
 
-def hyperparam_path(args, task='hetgnn'):
+def hyperparam_path(args):
     if args.read_model_path and args.testing:
         return args.read_model_path
-    if task in ['hetgnn', 'hetgnn+gp']:
-        exp_path = hyperparam_path_hetgnn(args)
-    else:
-        raise ValueError('Unrecognized task name %s' % (task))
+    exp_path = hyperparam_path_hetgnn(args)
     return os.path.join(EXP_PATH, args.task, exp_path)
 
 def hyperparam_path_hetgnn(args):
@@ -18,7 +15,7 @@ def hyperparam_path_hetgnn(args):
     # encoder params
     exp_path += '__emb_%s' % (args.embed_size) if args.ptm is None else 'ptm_%s' % (args.ptm)
     exp_path += '__gnn_%s_x_%s' % (args.gnn_hidden_size, args.gnn_num_layers)
-    exp_path += '__hop_%s' % (args.khops)
+    # exp_path += '__hop_%s' % (args.khops)
     exp_path += '__head_%s' % (args.num_heads)
     exp_path += '__dp_%s' % (args.dropout)
     exp_path += '__dpa_%s' % (args.attn_drop)

@@ -12,8 +12,8 @@ from model.model_utils import Registrable
 from model.model_constructor import *
 
 # initialization params, output path, logger, random seed and torch.device
-args = init_args(sys.argv[1:], task='hetgnn')
-exp_path = hyperparam_path(args, task='hetgnn')
+args = init_args(sys.argv[1:])
+exp_path = hyperparam_path(args)
 if not os.path.exists(exp_path):
     os.makedirs(exp_path)
 logger = set_logger(exp_path, args.testing)
@@ -41,7 +41,6 @@ args.word_vocab, args.relation_num = len(Example.word_vocab), len(Example.relati
 if args.read_model_path:
     model = Registrable.by_name('hetgnn-sql')(params, sql_trans).to(device)
     check_point = torch.load(open(os.path.join(args.read_model_path, 'model.bin'), 'rb'))
-    # model.load_state_dict(check_point['model'])
     model.load_state_dict(check_point)
     logger.info("Load saved model from path: %s" % (args.read_model_path))
 else:
@@ -72,8 +71,6 @@ if not args.testing:
     num_warmup_steps = int(num_training_steps * args.warmup_ratio)
     logger.info('Total training steps: %d;\t Warmup steps: %d' % (num_training_steps, num_warmup_steps))
     optimizer, scheduler = set_optimizer(model, args, num_warmup_steps, num_training_steps)
-    if args.read_model_path and args.load_optimizer:
-        optimizer.load_state_dict(check_point['optim'])
     nsamples, best_result = len(train_dataset), {'dev_acc': 0.}
     train_index, step_size = np.arange(nsamples), args.batch_size // args.grad_accumulate
     logger.info('Start training ......')
@@ -108,15 +105,11 @@ if not args.testing:
         logger.info('Evaluation: \tEpoch: %d\tTime: %.4f\tDev acc: %.4f' % (i, time.time() - start_time, dev_acc))
         if dev_acc > best_result['dev_acc']:
             best_result['dev_acc'], best_result['iter'] = dev_acc, i
-            torch.save({
-                'epoch': i, 'model': model.state_dict(),
-                'optim': optimizer.state_dict(),
-                'scheduler': scheduler.state_dict()
-            }, open(os.path.join(exp_path, 'model.bin'), 'wb'))
+            torch.save(model.state_dict(), open(os.path.join(exp_path, 'model.bin'), 'wb'))
             logger.info('NEW BEST MODEL: \tEpoch: %d\tDev acc: %.4f' % (i, dev_acc))
 
     check_point = torch.load(open(os.path.join(exp_path, 'model.bin'), 'rb'))
-    model.load_state_dict(check_point['model'])
+    model.load_state_dict(check_point)
     train_acc = decode('train', os.path.join(exp_path, 'train.iter' + str(best_result['iter'])), acc_type='sql')
     dev_acc_beam = decode('dev', output_path=os.path.join(exp_path, 'dev.iter' + str(best_result['iter']) + '.beam' + str(args.beam_size)), acc_type='beam')
     logger.info('FINAL BEST RESULT: \tEpoch: %d\tDev acc/Beam acc: %.4f/%.4f' % (best_result['iter'], best_result['dev_acc'], dev_acc_beam))

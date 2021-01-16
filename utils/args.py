@@ -2,7 +2,7 @@
 import argparse
 import sys
 
-def init_args(params=sys.argv[1:], task='hetgnn'):
+def init_args(params=sys.argv[1:]):
     arg_parser = argparse.ArgumentParser()
     arg_parser = add_argument_base(arg_parser)
     arg_parser = add_argument_encoder(arg_parser)
@@ -26,14 +26,13 @@ def add_argument_base(arg_parser):
     arg_parser.add_argument('--warmup_ratio', type=float, default=0.1, help='warmup steps proportion')
     arg_parser.add_argument('--lr_schedule', default='linear', choices=['constant', 'linear', 'ratsql', 'cosine'], help='lr scheduler')
     arg_parser.add_argument('--eval_after_epoch', default=40, type=int, help='Start to evaluate after x epoch')
-    arg_parser.add_argument('--load_optimizer', action='store_true', default=False, help='Whether to load optimizer state')
     arg_parser.add_argument('--max_epoch', type=int, default=100, help='terminate after maximum epochs')
     arg_parser.add_argument('--max_norm', default=5., type=float, help='clip gradients')
     return arg_parser
 
 def add_argument_encoder(arg_parser):
     # Encoder Hyperparams
-    arg_parser.add_argument('--model', choices=['lgnn', 'rgcn', 'rgat'], default='lgnn', help='which heterogeneous gnn model to use')
+    arg_parser.add_argument('--model', choices=['rat', 'lgnn', 'rgcn', 'rgat'], default='lgnn', help='which heterogeneous gnn model to use')
     arg_parser.add_argument('--ptm', type=str, choices=['bert-base-uncased', 'bert-large-uncased', 'bert-large-uncased-whole-word-masking',
         'roberta-base', 'roberta-large', 'grappa_large_jnt', 'electra-base-discriminator', 'electra-large-discriminator'], help='pretrained model name')
     arg_parser.add_argument('--add_cls', action='store_true', help='whether add [CLS] node')
@@ -46,6 +45,8 @@ def add_argument_encoder(arg_parser):
     arg_parser.add_argument('--gnn_hidden_size', default=256, type=int, help='size of GNN layers hidden states')
     arg_parser.add_argument('--khops', default=4, type=int, help='aggregate info from k-hop neighbours')
     arg_parser.add_argument('--num_heads', default=8, type=int, help='num of heads in multihead attn')
+    arg_parser.add_argument('--relation_share_layers', action='store_true')
+    arg_parser.add_argument('--relation_share_heads', action='store_true')
     return arg_parser
 
 def add_argument_decoder(arg_parser):

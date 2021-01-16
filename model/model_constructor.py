@@ -10,7 +10,7 @@ from model.decoder.sql_parser import *
 class HetGNNSQL(nn.Module):
     def __init__(self, args, transition_system):
         super(HetGNNSQL, self).__init__()
-        self.encoder = Registrable.by_name('encoder_' + args.model)(args)
+        self.encoder = Registrable.by_name('encoder_hetgnn')(args)
         self.encoder2decoder = PoolingFunction(args.gnn_hidden_size, args.lstm_hidden_size, method='attentive-pooling')
         self.decoder = Registrable.by_name('decoder_tranx')(args, transition_system)
 

@@ -27,18 +27,10 @@ class GraphFactory():
 
     def graph_construction(self, ex: dict, db: dict):
         """ Wrapper function """
-        return self.method(ex, db)
-
-    def batch_graphs(self, ex_list, device, train=True, **kwargs):
-        """ Batch graphs in example list """
-        return self.batch_method(ex_list, device, train=train, **kwargs)
-
-    def lgnn(self, ex, db):
         q = np.array(ex['relations'], dtype='<U100')
         s = np.array(db['relations'], dtype='<U100')
         q_s = np.array(ex['schema_linking'][0], dtype='<U100')
         s_q = np.array(ex['schema_linking'][1], dtype='<U100')
-        num_nodes = len(ex['processed_question_toks']) + len(db['table_names']) + len(db['column_names'])
         if self.add_cls:
             cls_cls = np.array(['cls-cls-identity'], dtype='<U100')[np.newaxis, :]
             cls_q = np.array(['cls-question'] * q.shape[0], dtype='<U100')[np.newaxis, :]
@@ -50,19 +42,25 @@ class GraphFactory():
                 np.concatenate([q_cls, q, q_s], axis=1),
                 np.concatenate([s_cls, s_q, s], axis=1)
             ], axis=0)
-            num_nodes += 1
         else:
             relation = np.concatenate([
                 np.concatenate([q, q_s], axis=1),
                 np.concatenate([s_q, s], axis=1)
             ], axis=0)
-
         relation = relation.flatten().tolist()
+        return self.method(ex, db, relation)
+
+    def batch_graphs(self, ex_list, device, train=True, **kwargs):
+        """ Batch graphs in example list """
+        return self.batch_method(ex_list, device, train=train, **kwargs)
+
+    def lgnn(self, ex, db, relation):
         # filter some relations to avoid too many nodes in the line graph
         filter_relations = ['question-question', 'table-table', 'column-column',
             'table-table-fk', 'table-table-fkr', 'table-table-fkb', 'column-column-sametable', 'table-column', 'column-table',
             'table-question-nomatch', 'question-table-nomatch', 'column-question-nomatch', 'question-column-nomatch',
             'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity']
+        num_nodes = int(math.sqrt(len(relation)))
         edges = [(idx // num_nodes, idx % num_nodes, self.relation_vocab[r]) for idx, r in enumerate(relation) if r not in filter_relations]
         num_edges = len(edges)
         src_ids, dst_ids = list(map(lambda r: r[0], edges)), list(map(lambda r: r[1], edges))
@@ -74,6 +72,25 @@ class GraphFactory():
         src_p = coo_matrix(([1.0] * num_edges, (src_ids, range(num_edges))), shape=(num_nodes, num_edges))
         dst_p = coo_matrix(([1.0] * num_edges, (dst_ids, range(num_edges))), shape=(num_nodes, num_edges))
         graph.incidence_matrix = (src_p, dst_p)
+        return graph
+
+    def rgat(self, ex, db, relation):
+        # alter some relations naming
+        relation_mapping_dict = {
+            "*-*-identity": 'column-column-identity', "*-question": "column-question-nomatch", "question-*": "question-column-nomatch",
+            "*-table": "column-table", "table-*": "table-column", "*-column": "column-column", "column-*": "column-column"
+        }
+        num_nodes = int(math.sqrt(len(relation)))
+        edges = [(idx // num_nodes, idx % num_nodes, self.relation_vocab[
+            (relation_mapping_dict[r] if r in relation_mapping_dict else r)])
+            for idx, r in enumerate(relation)]
+        num_edges = len(edges)
+        src_ids, dst_ids = list(map(lambda r: r[0], edges)), list(map(lambda r: r[1], edges))
+        rel_ids = list(map(lambda r: r[2], edges))
+        
+        graph = GraphExample()
+        graph.g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)
+        graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
         return graph
 
     def batch_lgnn(self, ex_list, device, train=True, **kwargs):
@@ -95,8 +112,13 @@ class GraphFactory():
         bg.incidence_matrix = (src_p, dst_p)
         return bg
 
-    def rgcn(self, entry, db):
-        pass
+    def batch_rgat(self, ex_list, device, train=True, **kwargs):
+        graph_list = [ex.graph for ex in ex_list]
+        bg = BatchedGraph()
+        g = dgl.batch([ex.g for ex in graph_list])
+        bg.g = g.to(device)
+        bg.edge_feat = torch.cat([ex.edge_feat for ex in graph_list], dim=0).to(device)
+        return bg
 
-    def rgat(self, entry, db):
+    def rgcn(self, entry, db):
         pass
