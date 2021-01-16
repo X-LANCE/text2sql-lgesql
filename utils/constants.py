@@ -16,4 +16,5 @@ RELATIONS = ['cls-cls-identity', 'cls-question', 'question-cls', 'cls-table', 't
     'column-question-exactmatch', 'column-question-partialmatch', 'column-question-nomatch', 'column-question-valuematch'] + \
     ['question-table-exactmatch', 'question-table-partialmatch', 'question-table-nomatch',
     'table-question-exactmatch', 'table-question-partialmatch', 'table-question-nomatch'] + \
+    ['question-question', 'table-table', 'column-column', 'table-column', 'column-table'] + \
     ['*-*-identity', '*-question', 'question-*', '*-table', 'table-*', '*-column', 'column-*']

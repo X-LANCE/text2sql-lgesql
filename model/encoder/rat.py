@@ -14,12 +14,12 @@ class RAT(nn.Module):
         self.num_layers = args.gnn_num_layers
         self.relation_num = args.relation_num
         self.relation_share_layers, self.relation_share_heads = args.relation_share_layers, args.relation_share_heads
-        edim = args.hidden_size // args.num_heads if self.relation_share_heads else args.hidden_size
+        edim = args.gnn_hidden_size // args.num_heads if self.relation_share_heads else args.gnn_hidden_size
         if self.relation_share_layers:
             self.relation_embed = nn.Embedding(args.relation_num, edim)
         else:
             self.relation_embed = nn.ModuleList([nn.Embedding(args.relation_num, edim) for _ in range(self.num_layers)])
-        self.gnn_layers = nn.ModuleList([RATLayer(args.hidden_size, num_heads=args.num_heads, feat_drop=args.dropout)
+        self.gnn_layers = nn.ModuleList([RATLayer(args.gnn_hidden_size, num_heads=args.num_heads, feat_drop=args.dropout)
             for _ in range(self.num_layers)])
 
     def forward(self, x, batch):

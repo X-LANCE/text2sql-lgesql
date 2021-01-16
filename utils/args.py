@@ -26,6 +26,7 @@ def add_argument_base(arg_parser):
     arg_parser.add_argument('--warmup_ratio', type=float, default=0.1, help='warmup steps proportion')
     arg_parser.add_argument('--lr_schedule', default='linear', choices=['constant', 'linear', 'ratsql', 'cosine'], help='lr scheduler')
     arg_parser.add_argument('--eval_after_epoch', default=40, type=int, help='Start to evaluate after x epoch')
+    arg_parser.add_argument('--load_optimizer', action='store_true', default=False, help='Whether to load optimizer state')
     arg_parser.add_argument('--max_epoch', type=int, default=100, help='terminate after maximum epochs')
     arg_parser.add_argument('--max_norm', default=5., type=float, help='clip gradients')
     return arg_parser

@@ -11,12 +11,14 @@ def hyperparam_path(args):
 
 def hyperparam_path_hetgnn(args):
     exp_path = '%s' % (args.model)
-    exp_path += '__cls' if args.add_cls else ''
+    exp_path += '_cls' if args.add_cls else ''
     # encoder params
-    exp_path += '__emb_%s' % (args.embed_size) if args.ptm is None else 'ptm_%s' % (args.ptm)
+    exp_path += '__emb_%s' % (args.embed_size) if args.ptm is None else '__ptm_%s' % (args.ptm)
     exp_path += '__gnn_%s_x_%s' % (args.gnn_hidden_size, args.gnn_num_layers)
+    exp_path += '__rel_share' if args.relation_share_layers else ''
     # exp_path += '__hop_%s' % (args.khops)
     exp_path += '__head_%s' % (args.num_heads)
+    exp_path += '__rel_share' if args.relation_share_heads else ''
     exp_path += '__dp_%s' % (args.dropout)
     exp_path += '__dpa_%s' % (args.attn_drop)
     exp_path += '__dpc_%s' % (args.drop_connect)

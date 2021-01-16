@@ -1,6 +1,6 @@
 #coding=utf8
 import numpy as np
-import dgl, torch
+import dgl, torch, math
 from scipy.sparse import coo_matrix, block_diag
 
 def sparse2th(mat):
@@ -74,7 +74,7 @@ class GraphFactory():
         graph.incidence_matrix = (src_p, dst_p)
         return graph
 
-    def rgat(self, ex, db, relation):
+    def rat(self, ex, db, relation):
         # alter some relations naming
         relation_mapping_dict = {
             "*-*-identity": 'column-column-identity', "*-question": "column-question-nomatch", "question-*": "question-column-nomatch",
@@ -87,7 +87,7 @@ class GraphFactory():
         num_edges = len(edges)
         src_ids, dst_ids = list(map(lambda r: r[0], edges)), list(map(lambda r: r[1], edges))
         rel_ids = list(map(lambda r: r[2], edges))
-        
+
         graph = GraphExample()
         graph.g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)
         graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
@@ -112,13 +112,10 @@ class GraphFactory():
         bg.incidence_matrix = (src_p, dst_p)
         return bg
 
-    def batch_rgat(self, ex_list, device, train=True, **kwargs):
+    def batch_rat(self, ex_list, device, train=True, **kwargs):
         graph_list = [ex.graph for ex in ex_list]
         bg = BatchedGraph()
         g = dgl.batch([ex.g for ex in graph_list])
         bg.g = g.to(device)
         bg.edge_feat = torch.cat([ex.edge_feat for ex in graph_list], dim=0).to(device)
         return bg
-
-    def rgcn(self, entry, db):
-        pass
