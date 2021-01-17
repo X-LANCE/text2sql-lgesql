@@ -2,8 +2,7 @@
 import torch
 import torch.nn as nn
 from model.encoder.graph_input import *
-# from model.encoder.rgat import RGAT
-# from model.encoder.lgnn import LGNN
+from model.encoder.lgnn import LGNN
 from model.encoder.rat import RAT
 from model.encoder.graph_output import *
 from model.model_utils import Registrable

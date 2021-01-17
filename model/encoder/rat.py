@@ -27,7 +27,7 @@ class RAT(nn.Module):
             lg_x = self.relation_embed(batch.graph.edge_feat)
         for i in range(self.num_layers):
             lg_x = self.relation_embed[i](batch.graph.edge_feat) if not self.relation_share_layers else lg_x
-            x, lg_x = self.gnn_layers[i](x, lg_x, batch)
+            x, lg_x = self.gnn_layers[i](x, lg_x, batch.graph.g)
         return x, lg_x
 
 class RATLayer(nn.Module):
@@ -49,20 +49,21 @@ class RATLayer(nn.Module):
         self.layernorm2 = nn.LayerNorm(self.hidden_size)
         self.feat_dropout = nn.Dropout(p=feat_drop)
 
-    def forward(self, x, lg_x, batch):
+    def forward(self, x, lg_x, g):
         """ @Params:
                 x: node feats, num_nodes x hidden_size
                 lg_x: edge feats, num_edges x hidden_size
-                batch: graph utils
+                g: dgl.graph
         """
         # pre-mapping q/k/v affine
         q, k, v = self.affine_q(self.feat_dropout(x)), self.affine_k(self.feat_dropout(x)), self.affine_v(self.feat_dropout(x))
-        g = batch.graph.g
+        e = lg_x.unsqueeze(1).expand(-1, self.num_heads, -1) if lg_x.size(-1) == self.d_k else \
+            lg_x.view(-1, self.num_heads, self.d_k) # not relation_share_heads
+        e = self.feat_dropout(e)
         with g.local_scope():
             g.ndata['q'], g.ndata['k'] = q.view(-1, self.num_heads, self.d_k), k.view(-1, self.num_heads, self.d_k)
             g.ndata['v'] = v.view(-1, self.num_heads, self.d_k)
-            g.edata['e'] = lg_x.unsqueeze(1).expand(-1, self.num_heads, -1) if lg_x.size(-1) == self.d_k else \
-                lg_x.view(-1, self.num_heads, self.d_k) # not relation_share_heads
+            g.edata['e'] = e
             out_x = self.propagate_attention(g)
         
         out_x = self.layernorm1(x + self.affine_o(out_x.view(-1, self.hidden_size)))
