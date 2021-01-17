@@ -56,34 +56,52 @@ class GraphFactory():
 
     def lgnn(self, ex, db, relation):
         # filter some relations to avoid too many nodes in the line graph
-        filter_relations = ['question-question', 'table-table', 'column-column',
-            'table-table-fk', 'table-table-fkr', 'table-table-fkb', 'column-column-sametable', 'table-column', 'column-table',
-            'table-question-nomatch', 'question-table-nomatch', 'column-question-nomatch', 'question-column-nomatch',
-            'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity']
+        # relation_mapping_dict = {
+        #     'question-*': 'question-column-nomatch',
+        #     'table-*': 'table-column-has',
+        # }
+        # we only allow edge flow to *, no edge start with *
+        filter_relations = ['question-question', 'table-table', 'column-column', 'table-column', 'column-table',
+            'table-table-fk', 'table-table-fkr', 'table-table-fkb', 'column-column-sametable',
+            '*-question', '*-table', '*-column',
+            # 'table-question-nomatch', 'question-table-nomatch', 'column-question-nomatch', 'question-column-nomatch',
+            'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity', '*-*-identity']
         num_nodes = int(math.sqrt(len(relation)))
-        edges = [(idx // num_nodes, idx % num_nodes, self.relation_vocab[r]) for idx, r in enumerate(relation) if r not in filter_relations]
+        edges = [(idx // num_nodes, idx % num_nodes, r) for idx, r in enumerate(relation) if r not in filter_relations]
         num_edges = len(edges)
         src_ids, dst_ids = list(map(lambda r: r[0], edges)), list(map(lambda r: r[1], edges))
-        rel_ids = list(map(lambda r: r[2], edges))
+        rel_ids = list(map(lambda r: self.relation_vocab[r[2]], edges))
 
         graph = GraphExample()
         graph.g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)
         graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
-        src_p = coo_matrix(([1.0] * num_edges, (src_ids, range(num_edges))), shape=(num_nodes, num_edges))
-        dst_p = coo_matrix(([1.0] * num_edges, (dst_ids, range(num_edges))), shape=(num_nodes, num_edges))
-        graph.incidence_matrix = (src_p, dst_p)
+        # construct line graph, remove some edges in the line graph
+        lg = graph.g.line_graph(backtracking=False)
+        match_ids = [idx for idx, r in enumerate(edges) if r[2] == 'question-*' or 'match' in r[2]]
+        src, dst, eids = lg.edges(form='all', order='eid')
+        eids = [e for u, v, e in zip(src.tolist(), dst.tolist(), eids.tolist()) if not (u in match_ids and v in match_ids)]
+        graph.lg = lg.edge_subgraph(torch.tensor(eids, dtype=torch.int32), preserve_nodes=True)
         return graph
 
     def rat(self, ex, db, relation):
-        # alter some relations naming
         relation_mapping_dict = {
-            "*-*-identity": 'column-column-identity', "*-question": "column-question-nomatch", "question-*": "question-column-nomatch",
-            "*-table": "column-table", "table-*": "table-column", "*-column": "column-column", "column-*": "column-column"
+            'question-*': 'question-column-nomatch',
+            'table-*': 'table-column-has',
         }
+        # we only allow edge flow to *, no edge start with *
+        filter_relations = ['question-question', 'table-table', 'column-column', 'table-column', 'column-table',
+            'table-table-fk', 'table-table-fkr', 'table-table-fkb', 'column-column-sametable',
+            '*-question', '*-table', '*-column',
+            # 'table-question-nomatch', 'question-table-nomatch', 'column-question-nomatch', 'question-column-nomatch',
+            'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity', '*-*-identity']
+        # relation_mapping_dict = {
+        #     "*-*-identity": 'column-column-identity', "*-question": "column-question-nomatch", "question-*": "question-column-nomatch",
+        #     "*-table": "column-table", "table-*": "table-column", "*-column": "column-column", "column-*": "column-column"
+        # }
         num_nodes = int(math.sqrt(len(relation)))
         edges = [(idx // num_nodes, idx % num_nodes, self.relation_vocab[
             (relation_mapping_dict[r] if r in relation_mapping_dict else r)])
-            for idx, r in enumerate(relation)]
+            for idx, r in enumerate(relation) if r not in filter_relations]
         num_edges = len(edges)
         src_ids, dst_ids = list(map(lambda r: r[0], edges)), list(map(lambda r: r[1], edges))
         rel_ids = list(map(lambda r: r[2], edges))
@@ -96,26 +114,14 @@ class GraphFactory():
     def batch_lgnn(self, ex_list, device, train=True, **kwargs):
         graph_list = [ex.graph for ex in ex_list]
         bg = BatchedGraph()
-        # g = dgl.batch([ex.g for ex in graph_list]).to(device)
-        # bg.g = (g, dgl.khop_graph(g, 2).to(device), dgl.khop_graph(g, 3).to(device), dgl.khop_graph(g, 4).to(device))
-        # lg = g.line_graph(backtracking=False)
-        # bg.lg = (lg, dgl.khop_graph(lg, 2).to(device), dgl.khop_graph(lg, 3).to(device), dgl.khop_graph(lg, 4).to(device))
-        g = dgl.batch([ex.g for ex in graph_list])
-        bg.g = (g.add_self_loop().to(device), dgl.khop_graph(g, 2).add_self_loop().to(device),
-            dgl.khop_graph(g, 3).add_self_loop().to(device), dgl.khop_graph(g, 4).add_self_loop().to(device))
-        lg = g.line_graph(backtracking=False)
-        bg.lg = (lg.add_self_loop().to(device), dgl.khop_graph(lg, 2).add_self_loop().to(device),
-            dgl.khop_graph(lg, 3).add_self_loop().to(device), dgl.khop_graph(lg, 4).add_self_loop().to(device))
+        bg.g = dgl.batch([ex.g for ex in graph_list]).to(device)
+        bg.lg = dgl.batch([ex.lg for ex in graph_list]).to(device)
         bg.edge_feat = torch.cat([ex.edge_feat for ex in graph_list], dim=0).to(device)
-        src_p = sparse2th(block_diag([ex.incidence_matrix[0] for ex in graph_list])).to(device)
-        dst_p = sparse2th(block_diag([ex.incidence_matrix[1] for ex in graph_list])).to(device)
-        bg.incidence_matrix = (src_p, dst_p)
         return bg
 
     def batch_rat(self, ex_list, device, train=True, **kwargs):
         graph_list = [ex.graph for ex in ex_list]
         bg = BatchedGraph()
-        g = dgl.batch([ex.g for ex in graph_list])
-        bg.g = g.to(device)
+        bg.g = dgl.batch([ex.g for ex in graph_list]).to(device)
         bg.edge_feat = torch.cat([ex.edge_feat for ex in graph_list], dim=0).to(device)
         return bg
