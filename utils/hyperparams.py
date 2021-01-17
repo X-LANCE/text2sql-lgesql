@@ -15,7 +15,7 @@ def hyperparam_path_hetgnn(args):
     # encoder params
     exp_path += '__emb_%s' % (args.embed_size) if args.ptm is None else '__ptm_%s' % (args.ptm)
     exp_path += '__gnn_%s_x_%s' % (args.gnn_hidden_size, args.gnn_num_layers)
-    exp_path += '__rel_share' if args.relation_share_layers else ''
+    # exp_path += '__rel_share' if args.relation_share_layers else ''
     # exp_path += '__hop_%s' % (args.khops)
     exp_path += '__head_%s' % (args.num_heads)
     exp_path += '__rel_share' if args.relation_share_heads else ''

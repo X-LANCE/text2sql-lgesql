@@ -28,9 +28,9 @@ class LGNN(nn.Module):
 
     def forward(self, x, batch):
         lg_x = self.relation_embed(batch.graph.edge_feat)
-        _, dst_ids = batch.graph.g.edges(order='eid')
+        _, dst_ids = batch.graph.g.edges(order='eid').long()
         for i in range(self.num_layers):
-            x, lg_x = self.gnn_layers[i](x, lg_x, batch.graph.g, batch.graph.lg, dst_ids)
+            x, lg_x = self.gnn_layers[i](x, lg_x, batch.graph.g, batch.graph.lg)
         return x, lg_x
 
 class LGNNLayer(nn.Module):
@@ -50,7 +50,7 @@ class LGNNLayer(nn.Module):
         """
         # parallel
         out_x, _ = self.node_update(x, lg_x, g)
-        e_x = torch.index_select(x, dim=0, index=dst_ids)
+        e_x = torch.index_select(x, dim=0, index=dst_ids.long())
         out_lg_x, _ = self.edge_update(lg_x, e_x, lg)
 
         # node update first
@@ -90,7 +90,7 @@ class EdgeUpdateLayer(nn.Module):
         with g.local_scope():
             g.ndata['q'], g.ndata['k'], g.ndata['v'] = q, k + e, v + e
             out_x = self.propagate_attention(g)
-        
+
         out_x = self.layernorm1(x + out_x)
         out_x = self.layernorm2(out_x + self.feedforward(out_x))
         return out_x, lg_x

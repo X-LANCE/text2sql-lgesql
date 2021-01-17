@@ -81,27 +81,28 @@ class GraphFactory():
         src, dst, eids = lg.edges(form='all', order='eid')
         eids = [e for u, v, e in zip(src.tolist(), dst.tolist(), eids.tolist()) if not (u in match_ids and v in match_ids)]
         graph.lg = lg.edge_subgraph(torch.tensor(eids, dtype=torch.int32), preserve_nodes=True)
+        assert not (graph.g.in_degrees() == 0).any() and not (graph.lg.in_degrees() == 0).any()
         return graph
 
     def rat(self, ex, db, relation):
-        relation_mapping_dict = {
-            'question-*': 'question-column-nomatch',
-            'table-*': 'table-column-has',
-        }
-        # we only allow edge flow to *, no edge start with *
-        filter_relations = ['question-question', 'table-table', 'column-column', 'table-column', 'column-table',
-            'table-table-fk', 'table-table-fkr', 'table-table-fkb', 'column-column-sametable',
-            '*-question', '*-table', '*-column',
-            # 'table-question-nomatch', 'question-table-nomatch', 'column-question-nomatch', 'question-column-nomatch',
-            'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity', '*-*-identity']
         # relation_mapping_dict = {
-        #     "*-*-identity": 'column-column-identity', "*-question": "column-question-nomatch", "question-*": "question-column-nomatch",
-        #     "*-table": "column-table", "table-*": "table-column", "*-column": "column-column", "column-*": "column-column"
+            # 'question-*': 'question-column-nomatch',
+            # 'table-*': 'table-column-has',
         # }
+        # we only allow edge flow to *, no edge start with *
+        # filter_relations = ['question-question', 'table-table', 'column-column', 'table-column', 'column-table',
+            # 'table-table-fk', 'table-table-fkr', 'table-table-fkb', 'column-column-sametable',
+            # '*-question', '*-table', '*-column',
+            # 'table-question-nomatch', 'question-table-nomatch', 'column-question-nomatch', 'question-column-nomatch',
+            # 'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity', '*-*-identity']
+        relation_mapping_dict = {
+            "*-*-identity": 'column-column-identity', "*-question": "column-question-nomatch", "question-*": "question-column-nomatch",
+            "*-table": "column-table", "table-*": "table-column", "*-column": "column-column", "column-*": "column-column"
+        }
         num_nodes = int(math.sqrt(len(relation)))
         edges = [(idx // num_nodes, idx % num_nodes, self.relation_vocab[
             (relation_mapping_dict[r] if r in relation_mapping_dict else r)])
-            for idx, r in enumerate(relation) if r not in filter_relations]
+            for idx, r in enumerate(relation)]
         num_edges = len(edges)
         src_ids, dst_ids = list(map(lambda r: r[0], edges)), list(map(lambda r: r[1], edges))
         rel_ids = list(map(lambda r: r[2], edges))
