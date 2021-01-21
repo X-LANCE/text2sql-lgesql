@@ -96,9 +96,9 @@ class Preprocessor():
         if len(db['foreign_keys']) > 0:
             col1, col2 = list(zip(*db['foreign_keys']))
             col_mat[col1, col2], col_mat[col2, col1] = 'column-column-fk', 'column-column-fkr'
-        col_mat[0, 0] = '*-*-identity'
         col_mat[0, list(range(c_num))] = '*-column'
         col_mat[list(range(c_num)), 0] = 'column-*'
+        col_mat[0, 0] = '*-*-identity'
 
         # relations between tables and columns, t_num*c_num and c_num*t_num
         tab_col_mat = np.array([['table-column'] * c_num for _ in range(t_num)], dtype=dtype)

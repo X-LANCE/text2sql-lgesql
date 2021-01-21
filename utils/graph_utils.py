@@ -2,6 +2,7 @@
 import numpy as np
 import dgl, torch, math
 from scipy.sparse import coo_matrix, block_diag
+import time
 
 def sparse2th(mat):
     value = mat.data
@@ -55,19 +56,24 @@ class GraphFactory():
         return self.batch_method(ex_list, device, train=train, **kwargs)
 
     def lgnn(self, ex, db, relation):
-        # filter some relations to avoid too many nodes in the line graph
-        # relation_mapping_dict = {
-        #     'question-*': 'question-column-nomatch',
-        #     'table-*': 'table-column-has',
-        # }
         # we only allow edge flow to *, no edge start with *
-        filter_relations = ['question-question', 'table-table', 'column-column', 'table-column', 'column-table',
+        filter_relations = [
+            'question-question', 'table-table', 'column-column', 'table-column', 'column-table',
+            'question-question-dist-2', 'question-question-dist2'
             'table-table-fk', 'table-table-fkr', 'table-table-fkb', 'column-column-sametable',
-            '*-question', '*-table', '*-column',
+            # '*-question', '*-table', '*-column',
             # 'table-question-nomatch', 'question-table-nomatch', 'column-question-nomatch', 'question-column-nomatch',
-            'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity', '*-*-identity']
+            'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity', '*-*-identity'
+        ]
+        # filter some relations to avoid too many nodes in the line graph
+        relation_mapping_dict = {
+            'question-*': 'question-column-nomatch',
+            '*-question': 'column-question-nomatch',
+            # 'table-*': 'table-column-has',
+        }
         num_nodes = int(math.sqrt(len(relation)))
-        edges = [(idx // num_nodes, idx % num_nodes, r) for idx, r in enumerate(relation) if r not in filter_relations]
+        edges = [(idx // num_nodes, idx % num_nodes, (relation_mapping_dict[r] if r in relation_mapping_dict else r))
+            for idx, r in enumerate(relation) if r not in filter_relations]
         num_edges = len(edges)
         src_ids, dst_ids = list(map(lambda r: r[0], edges)), list(map(lambda r: r[1], edges))
         rel_ids = list(map(lambda r: self.relation_vocab[r[2]], edges))
@@ -76,36 +82,37 @@ class GraphFactory():
         graph.g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)
         graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
         # construct line graph, remove some edges in the line graph
-        lg = graph.g.line_graph(backtracking=False)
-        match_ids = [idx for idx, r in enumerate(edges) if r[2] == 'question-*' or 'match' in r[2]]
-        src, dst, eids = lg.edges(form='all', order='eid')
-        eids = [e for u, v, e in zip(src.tolist(), dst.tolist(), eids.tolist()) if not (u in match_ids and v in match_ids)]
-        graph.lg = lg.edge_subgraph(torch.tensor(eids, dtype=torch.int32), preserve_nodes=True)
-        assert not (graph.g.in_degrees() == 0).any() and not (graph.lg.in_degrees() == 0).any()
+        graph.lg = graph.g.line_graph(backtracking=False).remove_self_loop().add_self_loop()
+        # lg = graph.g.line_graph(backtracking=False)
+        # match_ids = [idx for idx, r in enumerate(edges) if 'match' in r[2]]
+        # src, dst, eids = lg.edges(form='all', order='eid')
+        # eids = [e for u, v, e in zip(src.tolist(), dst.tolist(), eids.tolist()) if not (u in match_ids and v in match_ids)]
+        # graph.lg = lg.edge_subgraph(eids, preserve_nodes=True).remove_self_loop().add_self_loop()
+        # print(graph.g.num_nodes(), graph.g.num_edges(), graph.lg.num_nodes(), graph.lg.num_edges())
+        # if not (not (graph.g.in_degrees() == 0).any().item() and not (graph.lg.in_degrees() == 0).any()):
+            # print(ex['question'], ex['query'])
         return graph
 
     def rat(self, ex, db, relation):
-        # relation_mapping_dict = {
-            # 'question-*': 'question-column-nomatch',
-            # 'table-*': 'table-column-has',
-        # }
-        # we only allow edge flow to *, no edge start with *
-        # filter_relations = ['question-question', 'table-table', 'column-column', 'table-column', 'column-table',
+        filter_relations = [
+            # 'question-question', 'table-table', 'column-column', 'table-column', 'column-table',
+            # 'question-question-dist-2', 'question-question-dist2'
             # 'table-table-fk', 'table-table-fkr', 'table-table-fkb', 'column-column-sametable',
-            # '*-question', '*-table', '*-column',
+            # '*-table', '*-column', 'table-*', 'column-*',
+            # 'question-*', '*-question',
             # 'table-question-nomatch', 'question-table-nomatch', 'column-question-nomatch', 'question-column-nomatch',
-            # 'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity', '*-*-identity']
+            # 'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity', '*-*-identity'
+        ]
         relation_mapping_dict = {
             "*-*-identity": 'column-column-identity', "*-question": "column-question-nomatch", "question-*": "question-column-nomatch",
             "*-table": "column-table", "table-*": "table-column", "*-column": "column-column", "column-*": "column-column"
         }
         num_nodes = int(math.sqrt(len(relation)))
-        edges = [(idx // num_nodes, idx % num_nodes, self.relation_vocab[
-            (relation_mapping_dict[r] if r in relation_mapping_dict else r)])
-            for idx, r in enumerate(relation)]
+        edges = [(idx // num_nodes, idx % num_nodes, (relation_mapping_dict[r] if r in relation_mapping_dict else r))
+            for idx, r in enumerate(relation) if r not in filter_relations]
         num_edges = len(edges)
         src_ids, dst_ids = list(map(lambda r: r[0], edges)), list(map(lambda r: r[1], edges))
-        rel_ids = list(map(lambda r: r[2], edges))
+        rel_ids = list(map(lambda r: self.relation_vocab[r[2]], edges))
 
         graph = GraphExample()
         graph.g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)

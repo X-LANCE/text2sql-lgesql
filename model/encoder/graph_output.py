@@ -20,7 +20,7 @@ class PoolingFunction(nn.Module):
                 nn.Linear(hidden_size, 1, bias=bias)
             )
         elif self.method == 'multihead-attention':
-            self.attn = MultiHeadAttention(hidden_size, bias=bias, dropout=dropout, heads=heads)
+            self.attn = MultiHeadAttention(hidden_size, hidden_size, hidden_size, bias=bias, dropout=dropout, heads=heads)
         self.mapping_function = nn.Sequential(nn.Linear(hidden_size, output_size, bias=bias), nn.Tanh()) \
             if hidden_size != output_size else lambda x: x
 
@@ -63,16 +63,16 @@ class MultiHeadAttention(nn.Module):
         head(Q,K,V) = softmax(QW_qKW_k^T / sqrt(d_k)) VW_v
         MultiHead(Q,K,V) = Concat(head_1,head_2,...,head_n) W_o
     """
-    def __init__(self, hidden_size, bias=True, dropout=0., heads=8):
+    def __init__(self, hidden_size, query_size, key_value_size, bias=True, dropout=0., heads=8):
         super(MultiHeadAttention, self).__init__()
         self.heads = int(heads)
         self.hidden_size = hidden_size
         assert self.hidden_size % self.heads == 0, 'Head num %d must be divided by hidden size %d' % (heads, hidden_size)
         self.d_k = self.hidden_size // self.heads
         self.dropout_layer = nn.Dropout(p=dropout)
-        self.W_q, self.W_k, self.W_v = nn.Linear(self.hidden_size, self.hidden_size, bias=bias), \
-                nn.Linear(self.hidden_size, self.hidden_size, bias=bias), nn.Linear(self.hidden_size, self.hidden_size, bias=bias)
-        self.W_o = nn.Linear(self.hidden_size, self.hidden_size, bias=bias)
+        self.W_q, self.W_k, self.W_v = nn.Linear(query_size, self.hidden_size, bias=bias), \
+                nn.Linear(key_value_size, self.hidden_size, bias=False), nn.Linear(key_value_size, self.hidden_size, bias=False)
+        self.W_o = nn.Linear(self.hidden_size, query_size, bias=bias)
 
     def forward(self, hiddens, query_hiddens, mask=None):
         '''
