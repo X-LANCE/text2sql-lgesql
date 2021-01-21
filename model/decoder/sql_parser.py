@@ -1,17 +1,16 @@
 # coding=utf-8
 from __future__ import print_function
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from asdl.sql.sql_transition_system import SelectColumnAction, SelectTableAction
 from asdl.transition_system import ApplyRuleAction, ReduceAction
 from asdl.action_info import ActionInfo
 from asdl.hypothesis import Hypothesis
 from asdl.decode_hypothesis import DecodeHypothesis
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from utils.batch import Batch
 from model.decoder.onlstm import LSTM, ONLSTM
-from model.decoder.attention import *
-from model.model_utils import Registrable
+from model.model_utils import Registrable, MultiHeadAttention
 
 @Registrable.register('decoder_tranx')
 class SqlParser(nn.Module):
@@ -40,24 +39,27 @@ class SqlParser(nn.Module):
         cell_constructor = ONLSTM if args.lstm == 'onlstm' else LSTM
         self.decoder_lstm = cell_constructor(input_dim, args.lstm_hidden_size, num_layers=args.lstm_num_layers,
             chunk_num=args.chunk_size, dropout=args.dropout, dropconnect=args.drop_connect)
+        
+        # transform column embedding to production embedding space
+        self.column_lstm_input = nn.Linear(args.gnn_hidden_size, args.action_embed_size)
+        # transform table embedding to production embedding space
+        self.table_lstm_input = self.column_lstm_input # nn.Linear(args.gnn_hidden_size, args.action_embed_size)
 
-        self.column_lstm_input = nn.Linear(args.gnn_hidden_size, args.action_embed_size) # transform column embedding to production embedding space
-        self.table_lstm_input = self.column_lstm_input #nn.Linear(args.gnn_hidden_size, args.action_embed_size) # transform table embedding to production embedding space
+        self.context_attn = MultiHeadAttention(args.gnn_hidden_size, args.lstm_hidden_size, args.gnn_hidden_size, args.gnn_hidden_size,
+            num_heads=args.num_heads, feat_drop=args.dropout)
+        if args.sep_cxt: # calculate seperate context vector for question and database schema
+            self.schema_attn = MultiHeadAttention(args.gnn_hidden_size, args.lstm_hidden_size, args.gnn_hidden_size, args.gnn_hidden_size,
+                num_heads=args.num_heads, feat_drop=args.dropout)
 
-        # self.context_attn = Attention(args.gnn_hidden_size, args.lstm_hidden_size, dropout=args.dropout, method='nn') # attention between encoded items and decoder state
-        self.context_attn = MultiHeadAttention(args.gnn_hidden_size, args.lstm_hidden_size, dropout=args.dropout, heads=args.num_heads) # attention between encoded items and decoder state
-        if args.sep_cxt:
-            # self.schema_attn = Attention(args.gnn_hidden_size, args.lstm_hidden_size, dropout=args.dropout, method='nn') # attention between encoded items and decoder state
-            self.schema_attn = MultiHeadAttention(args.gnn_hidden_size, args.lstm_hidden_size, dropout=args.dropout, heads=args.num_heads) # attention between encoded items and decoder state
-
-        self.att_vec_linear = nn.Sequential(nn.Linear(args.lstm_hidden_size + cxt_num * args.gnn_hidden_size, args.att_vec_size), nn.Tanh()) # feature before ApplyRule or SelectColumn/Table
+        # feature vector before ApplyRule or SelectColumn/Table
+        self.att_vec_linear = nn.Sequential(nn.Linear(args.lstm_hidden_size + cxt_num * args.gnn_hidden_size, args.att_vec_size), nn.Tanh())
 
         self.apply_rule_affine = nn.Linear(args.att_vec_size, args.action_embed_size, bias=False)
         self.apply_rule = lambda x: F.linear(x, self.production_embed.weight) # re-use the action embedding matrix
-        # self.select_column = Attention(args.gnn_hidden_size, args.att_vec_size, dropout=args.dropout, method='dot')
-        self.select_column = MultiHeadAttention(args.gnn_hidden_size, args.att_vec_size, dropout=args.dropout, heads=args.num_heads)
-        # self.select_table = Attention(args.gnn_hidden_size, args.att_vec_size, dropout=args.dropout, method='dot')
-        self.select_table = MultiHeadAttention(args.gnn_hidden_size, args.att_vec_size, dropout=args.dropout, heads=args.num_heads)
+        self.select_column = MultiHeadAttention(args.gnn_hidden_size, args.att_vec_size, args.gnn_hidden_size, args.gnn_hidden_size,
+            num_heads=args.num_heads, feat_drop=args.dropout)
+        self.select_table = MultiHeadAttention(args.gnn_hidden_size, args.att_vec_size, args.gnn_hidden_size, args.gnn_hidden_size,
+            num_heads=args.num_heads, feat_drop=args.dropout)
 
     def score(self, encodings, mask, h0, batch):
         """ Training function

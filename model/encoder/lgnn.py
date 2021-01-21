@@ -4,10 +4,9 @@ import torch, dgl
 import dgl.function as fn
 import torch.nn as nn
 import torch.nn.functional as F
-from model.model_utils import Registrable
+from model.model_utils import Registrable, MultiHeadAttention, FFN
 from model.encoder.rat import RATLayer as NodeUpdateLayer
 from model.encoder.rat import scaled_exp, div_by_z
-from model.encoder.graph_output import MultiHeadAttention
 
 @Registrable.register('lgnn')
 class LGNN(nn.Module):
@@ -40,8 +39,8 @@ class LGNNLayer(nn.Module):
         super(LGNNLayer, self).__init__()
         self.ndim, self.edim = ndim, edim
         self.num_heads = num_heads
-        self.node_update = NodeUpdateLayer(self.ndim, self.num_heads, feat_drop)
-        self.edge_update = EdgeUpdateLayerNodeAffine(self.edim, self.ndim, feat_drop)
+        self.node_update = NodeUpdateLayer(self.ndim, self.edim, self.num_heads, feat_drop)
+        self.edge_update = EdgeUpdateLayerNodeAffine(self.edim, self.ndim, self.num_heads, feat_drop)
 
     def forward(self, x, lg_x, g, lg, src_ids, dst_ids):
         """ Different strategies to update nodes and edges:
@@ -70,116 +69,70 @@ class LGNNLayer(nn.Module):
 
 class EdgeUpdateLayerNodeAffine(nn.Module):
 
-    def __init__(self, edim, ndim, feat_drop=0.2):
+    def __init__(self, edim, ndim, num_heads=8, use_ffn=True, feat_drop=0.2):
         super(EdgeUpdateLayerNodeAffine, self).__init__()
         self.edim, self.ndim = edim, ndim
         self.affine = nn.Linear(self.edim + self.ndim * 2, self.edim)
-        self.feedforward = nn.Sequential(
-            nn.Linear(self.edim, self.edim * 4),
-            nn.ReLU(),
-            nn.Linear(self.edim * 4, self.edim)
-        )
-        self.layernorm1 = nn.LayerNorm(self.edim)
-        self.layernorm2 = nn.LayerNorm(self.edim)
+        self.layernorm = nn.LayerNorm(self.edim)
         self.feat_dropout = nn.Dropout(p=feat_drop)
+        self.use_ffn = use_ffn
+        if self.use_ffn:
+            self.ffn = FFN(self.edim)
 
     def forward(self, x, src_x, dst_x, g):
         concat_x = self.affine(self.feat_dropout(torch.cat([x, src_x, dst_x], dim=-1)))
         out_x = torch.tanh(concat_x)
-        out_x = self.layernorm1(x + out_x)
-        out_x = self.layernorm2(out_x + self.feedforward(out_x))
+        out_x = self.layernorm(x + out_x)
+        if self.use_ffn:
+            out_x = self.ffn(out_x)
         return out_x, (src_x, dst_x)
 
 class EdgeUpdateLayerNodeAttention(nn.Module):
 
-    def __init__(self, edim, ndim, num_heads=8, feat_drop=0.2):
+    def __init__(self, edim, ndim, num_heads=8, use_ffn=True, feat_drop=0.2):
         super(EdgeUpdateLayerNodeAttention, self).__init__()
         self.edim, self.ndim = edim, ndim
-        self.multihead_attn = MultiHeadAttention(self.ndim, self.edim, self.ndim, dropout=feat_drop, heads=num_heads)
-        self.feedforward = nn.Sequential(
-            nn.Linear(self.edim, self.edim * 4),
-            nn.ReLU(),
-            nn.Linear(self.edim * 4, self.edim)
-        )
-        self.layernorm1 = nn.LayerNorm(self.edim)
-        self.layernorm2 = nn.LayerNorm(self.edim)
+        self.multihead_attn = MultiHeadAttention(self.ndim, self.edim, self.ndim, self.edim,
+            num_heads=num_heads, feat_drop=feat_drop)
+        self.layernorm = nn.LayerNorm(self.edim)
+        self.use_ffn = use_ffn
+        if self.use_ffn:
+            self.ffn = FFN(self.edim)
 
     def forward(self, x, src_x, dst_x, g):
-        out_x = self.multihead_attn(torch.stack([src_x, dst_x], dim=1), x.unsqueeze(1)).squeeze(1)
-        out_x = self.layernorm1(x + out_x)
-        out_x = self.layernorm2(out_x + self.feedforward(out_x))
+        out_x, _ = self.multihead_attn(torch.stack([src_x, dst_x], dim=1), x)
+        out_x = self.layernorm(x + out_x)
+        if self.use_ffn:
+            out_x = self.ffn(out_x)
         return out_x, (src_x, dst_x)
 
 class EdgeUpdateLayerMetapath(nn.Module):
 
-    def __init__(self, edim, ndim, num_heads=8, feat_drop=0.2):
+    def __init__(self, edim, ndim, num_heads=8, use_node=True, feat_drop=0.2):
         super(EdgeUpdateLayerMetapath, self).__init__()
         self.edim, self.ndim = edim, ndim
         self.num_heads = num_heads
         self.d_k = self.ndim // self.num_heads
         self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.edim, self.ndim), \
-            nn.Linear(self.edim, self.ndim), nn.Linear(self.ndim, self.ndim)
+            nn.Linear(self.edim, self.ndim, bias=False), nn.Linear(self.edim, self.ndim, bias=False)
+        if self.use_node:
+            self.affine_n = nn.Linear(self.ndim, self.ndim)
         self.affine_o = nn.Linear(self.ndim, self.edim)
-        self.feedforward = nn.Sequential(
-            nn.Linear(self.edim, self.edim * 4),
-            nn.ReLU(),
-            nn.Linear(self.edim * 4, self.edim)
-        )
-        self.layernorm1 = nn.LayerNorm(self.edim)
-        self.layernorm2 = nn.LayerNorm(self.edim)
+        self.layernorm = nn.LayerNorm(self.edim)
         self.feat_dropout = nn.Dropout(p=feat_drop)
+        self.ffn = FFN(self.edim)
 
     def forward(self, x, src_x, dst_x, g):
         # we do not use node feats src_x and dst_x
         q, k, v = self.affine_q(self.feat_dropout(x)), self.affine_k(self.feat_dropout(x)), self.affine_v(self.feat_dropout(x))
         with g.local_scope():
-            g.ndata['q'], g.ndata['k'], g.ndata['v'] = q.view(-1, self.num_heads, self.d_k), k.view(-1, self.num_heads, self.d_k), \
+            g.ndata['q'] = q.view(-1, self.num_heads, self.d_k) if not self.use_node else \
+                (q + self.affine_n(self.feat_drop(src_x))).view(-1, self.num_heads, self.d_k)
+            g.ndata['k'], g.ndata['v'] = k.view(-1, self.num_heads, self.d_k), \
                 v.view(-1, self.num_heads, self.d_k)
             out_x = self.propagate_attention(g)
-        out_x = self.layernorm1(x + self.affine_o(out_x.view(-1, self.ndim)))
-        out_x = self.layernorm2(out_x + self.feedforward(out_x))
-        return out_x, (src_x, dst_x)
-
-    def propagate_attention(self, g):
-        # Compute attention score
-        g.apply_edges(src_dot_dst('k', 'q', 'score'))
-        g.apply_edges(scaled_exp('score', math.sqrt(self.d_k)))
-        # Update node state
-        g.update_all(fn.src_mul_edge('v', 'score', 'v'), fn.sum('v', 'wv'))
-        g.update_all(fn.copy_edge('score', 'score'), fn.sum('score', 'z'), div_by_z('wv', 'z', 'o'))
-        out_x = g.ndata['o']
-        return out_x
-
-class EdgeUpdateLayer(nn.Module):
-
-    def __init__(self, edim, ndim, num_heads=8, feat_drop=0.2):
-        super(EdgeUpdateLayerMetapath, self).__init__()
-        self.edim, self.ndim = edim, ndim
-        self.num_heads = num_heads
-        self.d_k = self.ndim // self.num_heads
-        self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.edim, self.ndim), \
-            nn.Linear(self.edim, self.ndim, bias=False), nn.Linear(self.ndim, self.ndim, bias=False)
-        self.affine_n = nn.Linear(self.ndim, self.ndim, bias=False)
-        self.affine_o = nn.Linear(self.ndim, self.edim)
-        self.feedforward = nn.Sequential(
-            nn.Linear(self.edim, self.edim * 4),
-            nn.ReLU(),
-            nn.Linear(self.edim * 4, self.edim)
-        )
-        self.layernorm1 = nn.LayerNorm(self.edim)
-        self.layernorm2 = nn.LayerNorm(self.edim)
-        self.feat_dropout = nn.Dropout(p=feat_drop)
-
-    def forward(self, x, src_x, dst_x, g):
-        # we do not use node feats src_x and dst_x
-        q, k, v = self.affine_q(self.feat_dropout(x)), self.affine_k(self.feat_dropout(x)), self.affine_v(self.feat_dropout(x))
-        e = self.affine_n(self.feat_drop(src_x))
-        with g.local_scope():
-            g.ndata['q'], g.ndata['k'], g.ndata['v'] = q.view(-1, self.num_heads, self.d_k), k.view(-1, self.num_heads, self.d_k), \
-                v.view(-1, self.num_heads, self.d_k)
-            out_x = self.propagate_attention(g)
-        out_x = self.layernorm1(x + self.affine_o(out_x.view(-1, self.ndim)))
-        out_x = self.layernorm2(out_x + self.feedforward(out_x))
+        out_x = self.layernorm(x + self.affine_o(out_x.view(-1, self.ndim)))
+        out_x = self.ffn(out_x)
         return out_x, (src_x, dst_x)
 
     def propagate_attention(self, g):

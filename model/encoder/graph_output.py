@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model.model_utils import lens2mask, tile
+from model.model_utils import lens2mask, tile, MultiHeadAttention
 
 class PoolingFunction(nn.Module):
     """ Map a sequence of hidden_size dim vectors into one fixed size vector with dimension output_size,
@@ -20,7 +20,7 @@ class PoolingFunction(nn.Module):
                 nn.Linear(hidden_size, 1, bias=bias)
             )
         elif self.method == 'multihead-attention':
-            self.attn = MultiHeadAttention(hidden_size, hidden_size, hidden_size, bias=bias, dropout=dropout, heads=heads)
+            self.attn = MultiHeadAttention(hidden_size, hidden_size, hidden_size, hidden_size, num_heads=heads, bias=bias, feat_drop=dropout)
         self.mapping_function = nn.Sequential(nn.Linear(hidden_size, output_size, bias=bias), nn.Tanh()) \
             if hidden_size != output_size else lambda x: x
 
@@ -57,41 +57,6 @@ class PoolingFunction(nn.Module):
                 return outputs.unsqueeze(1).expand(-1, targets.size(1), -1)
             else:
                 return outputs
-
-class MultiHeadAttention(nn.Module):
-    """ Transformer scaled dot production module
-        head(Q,K,V) = softmax(QW_qKW_k^T / sqrt(d_k)) VW_v
-        MultiHead(Q,K,V) = Concat(head_1,head_2,...,head_n) W_o
-    """
-    def __init__(self, hidden_size, query_size, key_value_size, bias=True, dropout=0., heads=8):
-        super(MultiHeadAttention, self).__init__()
-        self.heads = int(heads)
-        self.hidden_size = hidden_size
-        assert self.hidden_size % self.heads == 0, 'Head num %d must be divided by hidden size %d' % (heads, hidden_size)
-        self.d_k = self.hidden_size // self.heads
-        self.dropout_layer = nn.Dropout(p=dropout)
-        self.W_q, self.W_k, self.W_v = nn.Linear(query_size, self.hidden_size, bias=bias), \
-                nn.Linear(key_value_size, self.hidden_size, bias=False), nn.Linear(key_value_size, self.hidden_size, bias=False)
-        self.W_o = nn.Linear(self.hidden_size, query_size, bias=bias)
-
-    def forward(self, hiddens, query_hiddens, mask=None):
-        '''
-            @params:
-                hiddens : encoded sequence representations, bsize x seqlen x hidden_size
-                query_hiddens : bsize x tgtlen x hidden_size
-                mask : length mask for hiddens, ByteTensor, bsize x seqlen
-            @return:
-                context : bsize x tgtlen x hidden_size
-        '''
-        Q, K, V = self.W_q(self.dropout_layer(query_hiddens)), self.W_k(self.dropout_layer(hiddens)), self.W_v(self.dropout_layer(hiddens))
-        Q, K, V = Q.reshape(-1, Q.size(1), 1, self.heads, self.d_k), K.reshape(-1, 1, K.size(1), self.heads, self.d_k), V.reshape(-1, 1, V.size(1), self.heads, self.d_k)
-        e = (Q * K).sum(-1) / math.sqrt(self.d_k) # bsize x tgtlen x seqlen x heads
-        if mask is not None:
-            e = e + ((1 - mask.float()) * (-1e20)).unsqueeze(1).unsqueeze(-1)
-        a = torch.softmax(e, dim=2)
-        concat = (a.unsqueeze(-1) * V).sum(dim=2).reshape(-1, query_hiddens.size(1), self.hidden_size)
-        context = self.W_o(concat)
-        return context
 
 class ScoreFunction(nn.Module):
     def __init__(self, hidden_size, mlp=1, method='biaffine'):

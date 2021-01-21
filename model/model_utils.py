@@ -81,6 +81,60 @@ def rnn_wrapper(encoder, inputs, lens, cell='lstm'):
         return out, (h.contiguous(), c.contiguous())
     return out, h.contiguous()
 
+class MultiHeadAttention(nn.Module):
+
+    def __init__(self, hidden_size, q_size, kv_size, output_size, num_heads=8, bias=True, feat_drop=0.2, attn_drop=0.0):
+        super(MultiHeadAttention, self).__init__()
+        self.num_heads = int(num_heads)
+        self.hidden_size = hidden_size
+        assert self.hidden_size % self.num_heads == 0, 'Head num %d must be divided by hidden size %d' % (num_heads, hidden_size)
+        self.d_k = self.hidden_size // self.num_heads
+        self.feat_drop = nn.Dropout(p=feat_drop)
+        self.attn_drop = nn.Dropout(p=attn_drop)
+        self.W_q = nn.Linear(q_size, self.hidden_size, bias=bias)
+        self.W_k = nn.Linear(kv_size, self.hidden_size, bias=False)
+        self.W_v = nn.Linear(kv_size, self.hidden_size, bias=False)
+        self.W_o = nn.Linear(self.hidden_size, output_size, bias=bias)
+
+    def forward(self, hiddens, query_hiddens, mask=None):
+        ''' @params:
+                hiddens : encoded sequence representations, bsize x seqlen x hidden_size
+                query_hiddens : bsize [x tgtlen ]x hidden_size
+                mask : length mask for hiddens, ByteTensor, bsize x seqlen
+            @return:
+                context : bsize x[ tgtlen x] hidden_size
+        '''
+        remove_flag = False
+        if query_hiddens.dim() == 2:
+            query_hiddens, remove_flag = query_hiddens.unsqueeze(1), True
+        Q, K, V = self.W_q(self.feat_drop(query_hiddens)), self.W_k(self.feat_drop(hiddens)), self.W_v(self.feat_drop(hiddens))
+        Q, K, V = Q.reshape(-1, Q.size(1), 1, self.num_heads, self.d_k), K.reshape(-1, 1, K.size(1), self.num_heads, self.d_k), V.reshape(-1, 1, V.size(1), self.num_heads, self.d_k)
+        e = (Q * K).sum(-1) / math.sqrt(self.d_k) # bsize x tgtlen x seqlen x num_heads
+        if mask is not None:
+            e = e + ((1 - mask.float()) * (-1e20)).unsqueeze(1).unsqueeze(-1)
+        a = torch.softmax(e, dim=2)
+        concat = (a.unsqueeze(-1) * V).sum(dim=2).reshape(-1, query_hiddens.size(1), self.hidden_size)
+        context = self.W_o(concat)
+        if remove_flag:
+            return context.squeeze(dim=1), a.mean(dim=-1).squeeze(dim=1)
+        else:
+            return context, a.mean(dim=-1)
+
+class FFN(nn.Module):
+
+    def __init__(self, input_size):
+        super(FFN, self).__init__()
+        self.input_size = input_size
+        self.feedforward = nn.Sequential(
+            nn.Linear(self.input_size, self.input_size * 4),
+            nn.ReLU(),
+            nn.Linear(self.input_size * 4, self.input_size)
+        )
+        self.layernorm = nn.LayerNorm(self.input_size)
+
+    def forward(self, inputs):
+        return self.layernorm(inputs + self.feedforward(inputs))
+
 class Registrable(object):
     """
     A class that collects all registered components,
