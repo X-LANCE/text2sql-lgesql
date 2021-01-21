@@ -145,9 +145,9 @@ class LossFunction(nn.Module):
         else:
             raise ValueError('[Error]: Unrecognized loss function method %s !' % (self.method))
 
-    def forward(self, logits, mask, batch):
+    def forward(self, logits, mask, labels):
         selected_logits = logits.masked_select(mask)
-        loss =  self.function(selected_logits, batch.prune_labels)
+        loss =  self.function(selected_logits, labels)
         return loss
 
 class GraphOutputLayer(nn.Module):
@@ -164,6 +164,17 @@ class GraphOutputLayer(nn.Module):
         outputs = inputs.new_zeros(len(batch), batch.mask.size(1), self.hidden_size)
         outputs = outputs.masked_scatter_(batch.mask.unsqueeze(-1), inputs)
         return outputs, batch.mask
+
+class GraphOutputLayerWithPruning(nn.Module):
+
+    def __init__(self, hidden_size):
+        super(GraphOutputLayerWithPruning, self).__init__()
+    
+    def forward(self, inputs, batch):
+        outputs = inputs.new_zeros(len(batch), batch.mask.size(1), self.hidden_size)
+        outputs = outputs.masked_scatter_(batch.mask.unsqueeze(-1), inputs)
+        q_outputs, s_outputs = outputs[:, :batch.max_question_len], outputs[:, batch.max_question_len:]
+
 
 class BinaryFocalLoss(nn.Module):
 
