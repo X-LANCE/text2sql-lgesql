@@ -40,7 +40,7 @@ class LGNNLayer(nn.Module):
         self.ndim, self.edim = ndim, edim
         self.num_heads = num_heads
         self.node_update = NodeUpdateLayer(self.ndim, self.edim, self.num_heads, feat_drop)
-        self.edge_update = EdgeUpdateLayerNodeAffine(self.edim, self.ndim, self.num_heads, feat_drop)
+        self.edge_update = EdgeUpdateLayerMetaPath(self.edim, self.ndim, self.num_heads, feat_drop=feat_drop)
 
     def forward(self, x, lg_x, g, lg, src_ids, dst_ids):
         """ Different strategies to update nodes and edges:
@@ -106,16 +106,17 @@ class EdgeUpdateLayerNodeAttention(nn.Module):
             out_x = self.ffn(out_x)
         return out_x, (src_x, dst_x)
 
-class EdgeUpdateLayerMetapath(nn.Module):
+class EdgeUpdateLayerMetaPath(nn.Module):
 
-    def __init__(self, edim, ndim, num_heads=8, use_node=True, feat_drop=0.2):
-        super(EdgeUpdateLayerMetapath, self).__init__()
+    def __init__(self, edim, ndim, num_heads=8, use_node_feat=True, feat_drop=0.2):
+        super(EdgeUpdateLayerMetaPath, self).__init__()
         self.edim, self.ndim = edim, ndim
         self.num_heads = num_heads
         self.d_k = self.ndim // self.num_heads
         self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.edim, self.ndim), \
             nn.Linear(self.edim, self.ndim, bias=False), nn.Linear(self.edim, self.ndim, bias=False)
-        if self.use_node:
+        self.use_node_feat = use_node_feat
+        if self.use_node_feat:
             self.affine_n = nn.Linear(self.ndim, self.ndim)
         self.affine_o = nn.Linear(self.ndim, self.edim)
         self.layernorm = nn.LayerNorm(self.edim)
@@ -126,8 +127,8 @@ class EdgeUpdateLayerMetapath(nn.Module):
         # we do not use node feats src_x and dst_x
         q, k, v = self.affine_q(self.feat_dropout(x)), self.affine_k(self.feat_dropout(x)), self.affine_v(self.feat_dropout(x))
         with g.local_scope():
-            g.ndata['q'] = q.view(-1, self.num_heads, self.d_k) if not self.use_node else \
-                (q + self.affine_n(self.feat_drop(src_x))).view(-1, self.num_heads, self.d_k)
+            g.ndata['q'] = q.view(-1, self.num_heads, self.d_k) if not self.use_node_feat else \
+                (q + self.affine_n(self.feat_dropout(src_x))).view(-1, self.num_heads, self.d_k)
             g.ndata['k'], g.ndata['v'] = k.view(-1, self.num_heads, self.d_k), \
                 v.view(-1, self.num_heads, self.d_k)
             out_x = self.propagate_attention(g)

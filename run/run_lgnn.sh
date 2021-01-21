@@ -1,4 +1,4 @@
-task=lgnn_nodeaffine_contain_nomatch
+task=lgnn_metapath_contain_nomatch_new
 seed=999
 device=0
 testing='' #'--testing'
@@ -11,7 +11,7 @@ embed_size=300
 subword_aggregation=attentive-pooling
 schema_aggregation=head+tail
 gnn_hidden_size=512
-gnn_num_layers=4
+gnn_num_layers=$1
 relation_share_layers='--relation_share_layers'
 relation_share_heads=''
 khops=4
