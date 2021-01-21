@@ -38,7 +38,7 @@ class RATLayer(nn.Module):
         self.num_heads = num_heads
         self.d_k = self.hidden_size // self.num_heads
         self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.hidden_size, self.hidden_size),\
-            nn.Linear(self.hidden_size, self.hidden_size), nn.Linear(self.hidden_size, self.hidden_size)
+            nn.Linear(self.hidden_size, self.hidden_size, bias=False), nn.Linear(self.hidden_size, self.hidden_size, bias=False)
         self.affine_o = nn.Linear(self.hidden_size, self.hidden_size)
         self.feedforward = nn.Sequential(
             nn.Linear(self.hidden_size, self.hidden_size * 4),
@@ -65,7 +65,7 @@ class RATLayer(nn.Module):
             g.ndata['v'] = v.view(-1, self.num_heads, self.d_k)
             g.edata['e'] = e
             out_x = self.propagate_attention(g)
-        
+
         out_x = self.layernorm1(x + self.affine_o(out_x.view(-1, self.hidden_size)))
         out_x = self.layernorm2(out_x + self.feedforward(out_x))
         return out_x, lg_x

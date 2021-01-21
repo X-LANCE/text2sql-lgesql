@@ -1,4 +1,4 @@
-task=lgnn_remove_nomatch_include_star
+task=lgnn_nodeaffine_contain_nomatch
 seed=999
 device=0
 testing='' #'--testing'
@@ -11,9 +11,9 @@ embed_size=300
 subword_aggregation=attentive-pooling
 schema_aggregation=head+tail
 gnn_hidden_size=512
-gnn_num_layers=8
+gnn_num_layers=4
 relation_share_layers='--relation_share_layers'
-relation_share_heads='--relation_share_heads'
+relation_share_heads=''
 khops=4
 num_heads=8
 dropout=0.2
@@ -37,7 +37,7 @@ no_parent_state=''
 
 decode_max_step=100
 batch_size=20
-grad_accumulate=5
+grad_accumulate=10
 lr=2e-4
 layerwise_decay=0.8
 l2=0.1
