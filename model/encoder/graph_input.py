@@ -2,8 +2,7 @@
 import os, math
 import torch
 import torch.nn as nn
-from model.model_utils import rnn_wrapper, lens2mask
-from model.encoder.graph_output import PoolingFunction
+from model.model_utils import rnn_wrapper, lens2mask, PoolingFunction
 from transformers import AutoModel, AutoConfig
 
 class GraphInputLayer(nn.Module):

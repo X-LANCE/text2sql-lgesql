@@ -120,6 +120,44 @@ class MultiHeadAttention(nn.Module):
         else:
             return context, a.mean(dim=-1)
 
+class PoolingFunction(nn.Module):
+    """ Map a sequence of hidden_size dim vectors into one fixed size vector with dimension output_size """
+    def __init__(self, hidden_size=256, output_size=256, bias=True, method='attentive-pooling'):
+        super(PoolingFunction, self).__init__()
+        assert method in ['mean-pooling', 'max-pooling', 'attentive-pooling']
+        self.method = method
+        if self.method == 'attentive-pooling':
+            self.attn = nn.Sequential(
+                nn.Linear(hidden_size, hidden_size, bias=bias),
+                nn.Tanh(),
+                nn.Linear(hidden_size, 1, bias=bias)
+            )
+        self.mapping_function = nn.Sequential(nn.Linear(hidden_size, output_size, bias=bias), nn.Tanh()) \
+            if hidden_size != output_size else lambda x: x
+
+    def forward(self, inputs, mask=None):
+        """ @args:
+                inputs(torch.FloatTensor): features, batch_size x seq_len x hidden_size
+                mask(torch.BoolTensor): mask for inputs, batch_size x seq_len
+            @return:
+                outputs(torch.FloatTensor): aggregate seq_len dim for inputs, batch_size x output_size
+        """
+        if self.method == 'max-pooling':
+            outputs = inputs.masked_fill(~ mask.unsqueeze(-1), -1e8)
+            outputs = outputs.max(dim=1)[0]
+        elif self.method == 'mean-pooling':
+            mask_float = mask.float().unsqueeze(-1)
+            outputs = (inputs * mask_float).sum(dim=1) / mask_float.sum(dim=1)
+        elif self.method == 'attentive-pooling':
+            e = self.attn(inputs).squeeze(-1)
+            e = e + (1 - mask.float()) * (-1e20)
+            a = torch.softmax(e, dim=1).unsqueeze(1)
+            outputs = torch.bmm(a, inputs).squeeze(1)
+        else:
+            raise ValueError('[Error]: Unrecognized pooling method %s !' % (self.method))
+        outputs = self.mapping_function(outputs)
+        return outputs
+
 class FFN(nn.Module):
 
     def __init__(self, input_size):

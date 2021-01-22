@@ -3,62 +3,12 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model.model_utils import lens2mask, tile, MultiHeadAttention
-
-class PoolingFunction(nn.Module):
-    """ Map a sequence of hidden_size dim vectors into one fixed size vector with dimension output_size,
-    and expand multiple times if necessary
-    """
-    def __init__(self, hidden_size=256, output_size=256, dropout=0., heads=8, bias=True, method='multihead-attention'):
-        super(PoolingFunction, self).__init__()
-        assert method in ['mean-pooling', 'max-pooling', 'attentive-pooling', 'multihead-attention']
-        self.method = method
-        if self.method == 'attentive-pooling':
-            self.attn = nn.Sequential(
-                nn.Linear(hidden_size, hidden_size, bias=bias),
-                nn.Tanh(),
-                nn.Linear(hidden_size, 1, bias=bias)
-            )
-        elif self.method == 'multihead-attention':
-            self.attn = MultiHeadAttention(hidden_size, hidden_size, hidden_size, hidden_size, num_heads=heads, bias=bias, feat_drop=dropout)
-        self.mapping_function = nn.Sequential(nn.Linear(hidden_size, output_size, bias=bias), nn.Tanh()) \
-            if hidden_size != output_size else lambda x: x
-
-    def forward(self, inputs, targets=None, mask=None):
-        """
-        @args:
-            inputs(torch.FloatTensor): features, batch_size x seq_len x hidden_size
-            targets(torch.FloatTensor): features, batch_size x tgt_len x hidden_size
-            mask(torch.BoolTensor): mask for inputs, batch_size x seq_len
-        @return:
-            outputs(torch.FloatTensor): aggregate the seq_len dim for inputs
-                and expand to tgt_len (targets is not None), batch_size [x tgt_len ]x hidden_size
-        """
-        if self.method == 'multihead-attention':
-            assert targets is not None
-            outputs = self.attn(inputs, targets, mask)
-            return self.mapping_function(outputs)
-        else:
-            if self.method == 'max-pooling':
-                outputs = inputs.masked_fill(~ mask.unsqueeze(-1), -1e8)
-                outputs = outputs.max(dim=1)[0]
-            elif self.method == 'mean-pooling':
-                mask_float = mask.float().unsqueeze(-1)
-                outputs = (inputs * mask_float).sum(dim=1) / mask_float.sum(dim=1)
-            elif self.method == 'attentive-pooling':
-                e = self.attn(inputs).squeeze(-1)
-                e = e + (1 - mask.float()) * (-1e20)
-                a = torch.softmax(e, dim=1).unsqueeze(1)
-                outputs = torch.bmm(a, inputs).squeeze(1)
-            else:
-                raise ValueError('[Error]: Unrecognized pooling method %s !' % (self.method))
-            outputs = self.mapping_function(outputs)
-            if targets is not None:
-                return outputs.unsqueeze(1).expand(-1, targets.size(1), -1)
-            else:
-                return outputs
+from model.model_utils import Registrable
+from model.encoder.rat import scaled_exp, div_by_z
+from model.encoder.lgnn import src_dot_dst
 
 class ScoreFunction(nn.Module):
+
     def __init__(self, hidden_size, mlp=1, method='biaffine'):
         super(ScoreFunction, self).__init__()
         assert method in ['dot', 'bilinear', 'affine', 'biaffine']
@@ -69,112 +19,124 @@ class ScoreFunction(nn.Module):
             self.mlp_s = nn.Sequential(nn.Linear(hidden_size, self.hidden_size), nn.Tanh())
         self.method = method
         if self.method == 'bilinear':
-            self.W = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+            self.W = nn.Linear(self.hidden_size, self.hidden_size)
         elif self.method == 'affine':
             self.affine = nn.Linear(self.hidden_size * 2, 1)
         elif self.method == 'biaffine':
-            self.W = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+            self.W = nn.Linear(self.hidden_size, self.hidden_size)
             self.affine = nn.Linear(self.hidden_size * 2, 1)
 
-    def forward(self, question, schema):
+    def forward(self, context, node):
         """
         @args:
-            question(torch.FloatTensor): bsize x schema_len x hidden_size
-            schema(torch.FloatTensor): bsize x schema_len x hidden_size
+            context(torch.FloatTensor): num_nodes x hidden_size
+            node(torch.FloatTensor): num_nodes x hidden_size
         @return:
-            scores(torch.FloatTensor): bsize x schema_len
+            scores(torch.FloatTensor): num_nodes
         """
         if self.mlp > 1:
-            question, schema = self.mlp_q(question), self.mlp_s(schema)
+            context, node = self.mlp_q(context), self.mlp_s(node)
         if self.method == 'dot':
-            scores = (question * schema).sum(dim=-1)
+            scores = (context * node).sum(dim=-1)
         elif self.method == 'bilinear':
-            scores = (question * self.W(schema)).sum(dim=-1)
+            scores = (context * self.W(node)).sum(dim=-1)
         elif self.method == 'affine':
-            scores = self.affine(torch.cat([question, schema], dim=-1)).squeeze(-1)
+            scores = self.affine(torch.cat([context, node], dim=-1)).squeeze(-1)
         elif self.method == 'biaffine':
-            scores = (question * self.W(schema)).sum(dim=-1)
-            scores += self.affine(torch.cat([question, schema], dim=-1)).squeeze(-1)
+            scores = (context * self.W(node)).sum(dim=-1)
+            scores += self.affine(torch.cat([context, node], dim=-1)).squeeze(-1)
         else:
             raise ValueError('[Error]: Unrecognized score function method %s!' % (self.method))
         return scores
 
-class LossFunction(nn.Module):
-    def __init__(self, method='bce', alpha=0.5, gamma=2, pos_weight=1.0, reduction='sum'):
-        super(LossFunction, self).__init__()
-        self.method = method
-        if self.method == 'bce':
-            self.function = nn.BCEWithLogitsLoss(reduction=reduction, pos_weight=torch.full([1], pos_weight))
-        elif self.method == 'focal':
-            self.function = BinaryFocalLoss(gamma, alpha=alpha, reduction=reduction)
-        else:
-            raise ValueError('[Error]: Unrecognized loss function method %s !' % (self.method))
-
-    def forward(self, logits, mask, labels):
-        selected_logits = logits.masked_select(mask)
-        loss =  self.function(selected_logits, labels)
-        return loss
-
+@Registrable.register('no_pruning')
 class GraphOutputLayer(nn.Module):
 
-    def __init__(self, hidden_size):
+    def __init__(self, args):
         super(GraphOutputLayer, self).__init__()
-        self.hidden_size = hidden_size
+        self.hidden_size = args.gnn_hidden_size
 
-    def forward(self, inputs, batch):
+    def forward(self, inputs, lg_inputs, batch):
         """ Re-scatter data format:
                 inputs: sum(q_len + t_len + c_len) x hidden_size
                 outputs: bsize x (max_q_len + max_t_len + max_c_len) x hidden_size
         """
         outputs = inputs.new_zeros(len(batch), batch.mask.size(1), self.hidden_size)
         outputs = outputs.masked_scatter_(batch.mask.unsqueeze(-1), inputs)
-        return outputs, batch.mask
+        if self.training:
+            return outputs, batch.mask, 0.
+        else:
+            return outputs, batch.mask
 
+@Registrable.register('graph_pruning')
 class GraphOutputLayerWithPruning(nn.Module):
 
-    def __init__(self, hidden_size):
+    def __init__(self, args):
         super(GraphOutputLayerWithPruning, self).__init__()
+        self.hidden_size = args.gnn_hidden_size
+        self.graph_pruning = GraphPruning(self.hidden_size, args.num_heads, args.feat_drop, args.score_function)
     
-    def forward(self, inputs, batch):
+    def forward(self, inputs, lg_inputs, batch):
         outputs = inputs.new_zeros(len(batch), batch.mask.size(1), self.hidden_size)
         outputs = outputs.masked_scatter_(batch.mask.unsqueeze(-1), inputs)
-        q_outputs, s_outputs = outputs[:, :batch.max_question_len], outputs[:, batch.max_question_len:]
 
-
-class BinaryFocalLoss(nn.Module):
-
-    def __init__(self, gamma, alpha=0., reduction='sum'):
-        """ alpha can be viewed as label re-weight factor, such as pos_weight param in BCEWithLogitsLoss
-        0 < alpha < 1, alpha * log p_t if label == 1, else (1 - alpha) * log (1 - p_t) if label == 0,
-        by default, we do not use this hyper-parameter, None
-            gamma, the larger gamma is, the less attention is paid to already correctly classified examples,
-        if gamma is 0, equal to traditional BinaryCrossEntropyLoss
-        """
-        super(BinaryFocalLoss, self).__init__()
-        assert reduction in ['none', 'mean', 'sum']
-        self.gamma, self.reduction = gamma, reduction
-        if alpha >= 1. or alpha <= 0.:
-            self.alpha = None
+        if self.training:
+            # extract context, node and edge feats
+            context = inputs.masked_select(batch.context_index.unsqueeze(-1)).view(-1, self.hidden_size)
+            node = inputs.masked_select(batch.node_index.unsqueeze(-1)).view(-1, self.hidden_size)
+            edge = lg_inputs.masked_select(batch.edge_index.unsqueeze(-1)).view(-1, self.hidden_size)
+            loss = self.graph_pruning(context, node, edge, batch.gp_ng, batch.gp_eg, batch.node_label, batch.edge_label)
+            return outputs, batch.mask, loss
         else:
-            self.alpha = torch.tensor([1 - alpha, alpha], dtype=torch.float)
+            return outputs, batch.mask
 
-    def forward(self, logits, targets):
-        """
-            logits: score before sigmoid activation, flattened 1-dim
-            targets: label for each logit, FloatTensor, flattened 1-dim
-        """
-        pt = torch.sigmoid(logits)
-        pt = torch.stack([1 - pt, pt], dim=-1) # num x 2
-        labels = (targets >= 0.5).long()
-        pt = pt.gather(1, labels.unsqueeze(-1)).squeeze(-1)
-        logpt = torch.log(pt)
-        if self.alpha is not None:
-            alpha = self.alpha.to(logits.device).gather(0, labels)
-            logpt = alpha * logpt
-        loss = - (1 - pt)**self.gamma * logpt
-        if self.reduction == 'none':
-            return loss
-        elif self.reduction == 'mean':
-            return loss.mean()
-        else:
-            return loss.sum()
+class GraphPruning(nn.Module):
+
+    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2, score_function='affine'):
+        super(GraphPruning, self).__init__()
+        self.hidden_size = hidden_size
+        self.node_mha = DGLMHA(hidden_size, num_heads, feat_drop)
+        self.edge_mha = DGLMHA(hidden_size, num_heads, feat_drop)
+        self.node_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
+        self.edge_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
+        self.loss_function = nn.BCEWithLogitsLoss(reduction='sum')
+
+    def forward(self, context, node, edge, ng, eg, nl, el):
+        node_context = self.node_mha(context, node, ng)
+        edge_context = self.edge_mha(context, edge, eg)
+        node_score = self.node_score_function(node_context, node)
+        edge_score = self.edge_score_function(edge_context, edge)
+        loss = self.loss_function(node_score, nl), self.loss_function(edge_score, el)
+        return loss
+
+class DGLMHA(nn.Module):
+    """ Multi-head attention implemented with DGL lib
+    """
+    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2):
+        super(DGLMHA, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_heads = num_heads
+        self.d_k = self.hidden_size // self.num_heads
+        self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.hidden_size, self.hidden_size),\
+            nn.Linear(self.hidden_size, self.hidden_size, bias=False), nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.affine_o = nn.Linear(self.hidden_size, self.hidden_size)
+        self.feat_dropout = nn.Dropout(p=feat_drop)
+
+    def forward(self, context, node, g):
+        q, k, v = self.affine_q(self.feat_dropout(node)), self.affine_k(self.feat_dropout(context)), self.affine_v(self.feat_dropout(context))
+        with g.local_scope():
+            g.nodes['node'].data['q'] = q.view(-1, self.num_heads, self.d_k)
+            g.nodes['context'].data['k'] = k.view(-1, self.num_heads, self.d_k)
+            g.nodes['context'].data['v'] = v.view(-1, self.num_heads, self.d_k)
+            out_x = self.propagate_attention(g)
+        return out_x
+
+    def propagate_attention(self, g):
+        # Compute attention score
+        g.apply_edges(src_dot_dst('k', 'q', 'score'))
+        g.apply_edges(scaled_exp('score', math.sqrt(self.d_k)))
+        # Update node state
+        g.update_all(fn.src_mul_edge('v', 'score', 'v'), fn.sum('v', 'wv'))
+        g.update_all(fn.copy_edge('score', 'score'), fn.sum('score', 'z'), div_by_z('wv', 'z', 'o'))
+        out_x = g.nodes['node'].data['o']
+        return out_x

@@ -90,9 +90,39 @@ class GraphFactory():
         src, dst, eids = lg.edges(form='all', order='eid')
         eids = [e for u, v, e in zip(src.tolist(), dst.tolist(), eids.tolist()) if not (u in match_ids and v in match_ids)]
         graph.lg = lg.edge_subgraph(eids, preserve_nodes=True).remove_self_loop().add_self_loop()
-        # print(graph.g.num_nodes(), graph.g.num_edges(), graph.lg.num_nodes(), graph.lg.num_edges())
-        # if not (not (graph.g.in_degrees() == 0).any().item() and not (graph.lg.in_degrees() == 0).any()):
-            # print(ex['question'], ex['query'])
+
+        # graph pruning for nodes
+        q_num = len(ex['processed_question_toks']) + 1 if self.add_cls else len(ex['processed_question_toks'])
+        s_num = num_nodes - q_num
+        graph.context_index = torch.tensor([1] * q_num + [0] * s_num, dtype=torch.bool)
+        graph.node_index = ~ graph.context_index
+        graph.gp_ng = dgl.heterograph({
+            ('context', 'to', 'node'): (list(range(q_num)) * s_num,
+            [i for i in range(s_num) for _ in range(q_num)])
+            }, num_nodes_dict={'context': q_num, 'node': s_num}, idtype=torch.int32
+        )
+        t_num = len(ex['processed_table_toks'])
+        def check_node(i):
+            if i < t_num and i in ex['used_tables']:
+                return 1.0
+            elif i >= t_num and i - t_num in ex['used_columns']:
+                return 1.0
+            else: return 0.0
+        graph.node_label = torch.tensor(list(map(check_node, range(s_num))), dtype=torch.float)
+
+        # graph pruning for edges
+        graph.edge_index = torch.tensor(list(map(lambda e: 1 if e[0] >= q_num and e[1] >= q_num else 0, edges)), dtype=torch.bool)
+        e_num = graph.edge_index.int().sum().item()
+        graph.gp_eg = dgl.heterograph({
+            ('context', 'to', 'node'): (list(range(q_num)) * e_num,
+            [i for i in range(e_num) for _ in range(q_num)])
+            }, num_nodes_dict={'context': q_num, 'node': e_num}, idtype=torch.int32
+        )
+        def check_edge(t):
+            if check_node(t[0]) + check_node(t[1]) > 1.5:
+                return 1.0
+            else: return 0.0
+        graph.edge_label = torch.tensor(list(map(check_edge, filter(lambda e: e[0] >= q_num and e[1] >= q_num, edges))), dtype=torch.float)
         return graph
 
     def rat(self, ex, db, relation):
@@ -127,6 +157,13 @@ class GraphFactory():
         bg.g = dgl.batch([ex.g for ex in graph_list]).to(device)
         bg.lg = dgl.batch([ex.lg for ex in graph_list]).to(device)
         bg.edge_feat = torch.cat([ex.edge_feat for ex in graph_list], dim=0).to(device)
+        bg.context_index = torch.cat([ex.context_index for ex in graph_list], dim=0).to(device)
+        bg.node_index = torch.cat([ex.node_index for ex in graph_list], dim=0).to(device)
+        bg.node_label = torch.cat([ex.node_label for ex in graph_list], dim=0).to(device)
+        bg.edge_index = torch.cat([ex.edge_index for ex in graph_list], dim=0).to(device)
+        bg.edge_label = torch.cat([ex.edge_label for ex in graph_list], dim=0).to(device)
+        bg.gp_ng = dgl.batch([ex.gp_ng for ex in graph_list]).to(device)
+        bg.gp_eg = dgl.batch([ex.gp_eg for ex in graph_list]).to(device)
         return bg
 
     def batch_rat(self, ex_list, device, train=True, **kwargs):

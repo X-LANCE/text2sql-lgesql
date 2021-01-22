@@ -1,9 +1,8 @@
 #coding=utf8
 import torch
 import torch.nn as nn
-from model.model_utils import Registrable
+from model.model_utils import Registrable, PoolingFunction
 from model.encoder.graph_encoder import *
-from model.encoder.graph_output import *
 from model.decoder.sql_parser import *
 
 @Registrable.register('hetgnn-sql')
@@ -17,10 +16,10 @@ class HetGNNSQL(nn.Module):
     def forward(self, batch):
         """ This function is used during training, which returns the entire training loss
         """
-        encodings, mask = self.encoder(batch)
+        encodings, mask, gp_loss = self.encoder(batch)
         h0 = self.encoder2decoder(encodings, mask=mask)
         loss = self.decoder.score(encodings, mask, h0, batch)
-        return loss
+        return loss, gp_loss
 
     def parse(self, batch, beam_size):
         """ This function is used for decoding, which returns a batch of [DecodeHypothesis()] * beam_size

@@ -44,11 +44,10 @@ class Example():
         examples, outliers = [], 0
         for ex in datasets:
             if choice == 'train' and len(cls.tables[ex['db_id']]['processed_column_toks']) > 100:
-            # if len(ex['question_toks']) == 1 or (choice == 'train' and len(cls.tables[ex['db_id']]['processed_column_toks']) > 100):
                 outliers += 1
                 continue
             examples.append(cls(ex, cls.tables[ex['db_id']]))
-            if choice == 'train' and debug and len(examples) >= 100:
+            if debug and len(examples) >= 100:
                 return examples
         if choice == 'train':
             print("Skip %d extremely large samples in training dataset ..." % (outliers))

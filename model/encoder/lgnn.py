@@ -129,8 +129,9 @@ class EdgeUpdateLayerMetaPath(nn.Module):
         with g.local_scope():
             g.ndata['q'] = q.view(-1, self.num_heads, self.d_k) if not self.use_node_feat else \
                 (q + self.affine_n(self.feat_dropout(src_x))).view(-1, self.num_heads, self.d_k)
-            g.ndata['k'], g.ndata['v'] = k.view(-1, self.num_heads, self.d_k), \
-                v.view(-1, self.num_heads, self.d_k)
+            g.ndata['k'] = k.view(-1, self.num_heads, self.d_k)
+            g.ndata['v'] = v.view(-1, self.num_heads, self.d_k) if not self.use_node_feat else \
+                (v + self.affine_n(self.feat_dropout(src_x))).view(-1, self.num_heads, self.d_k)
             out_x = self.propagate_attention(g)
         out_x = self.layernorm(x + self.affine_o(out_x.view(-1, self.ndim)))
         out_x = self.ffn(out_x)

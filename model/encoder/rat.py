@@ -66,16 +66,16 @@ class RATLayer(nn.Module):
 
     def propagate_attention(self, g):
         # Compute attention score
-        g.apply_edges(src_sum_edge_dot_dst('k', 'q', 'e', 'score'))
+        g.apply_edges(src_sum_edge_mul_dst('k', 'q', 'e', 'score'))
         g.apply_edges(scaled_exp('score', math.sqrt(self.d_k)))
         # Update node state
-        # g.update_all(src_sum_edge_dot_edge('v', 'e', 'score', 'v'), fn.sum('v', 'wv'))
-        g.update_all(fn.src_mul_edge('v', 'score', 'v'), fn.sum('v', 'wv'))
+        g.update_all(src_sum_edge_mul_edge('v', 'e', 'score', 'v'), fn.sum('v', 'wv'))
+        # g.update_all(fn.src_mul_edge('v', 'score', 'v'), fn.sum('v', 'wv'))
         g.update_all(fn.copy_edge('score', 'score'), fn.sum('score', 'z'), div_by_z('wv', 'z', 'o'))
         out_x = g.ndata['o']
         return out_x
 
-def src_sum_edge_dot_dst(src_field, dst_field, e_field, out_field):
+def src_sum_edge_mul_dst(src_field, dst_field, e_field, out_field):
     def func(edges):
         return {out_field: ((edges.src[src_field] + edges.data[e_field]) * edges.dst[dst_field]).sum(-1, keepdim=True)}
 
@@ -88,7 +88,7 @@ def scaled_exp(field, scale_constant):
 
     return func
 
-def src_sum_edge_dot_edge(src_field, e_field1, e_field2, out_field):
+def src_sum_edge_mul_edge(src_field, e_field1, e_field2, out_field):
     def func(edges):
         return {out_field: (edges.src[src_field] + edges.data[e_field1]) * edges.data[e_field2]}
 

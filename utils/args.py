@@ -34,6 +34,7 @@ def add_argument_base(arg_parser):
 def add_argument_encoder(arg_parser):
     # Encoder Hyperparams
     arg_parser.add_argument('--model', choices=['rat', 'lgnn'], default='lgnn', help='which heterogeneous gnn model to use')
+    arg_parser.add_argument('--output_model', choices=['no_pruning', 'graph_pruning'], default='no_pruning', help='whether add graph pruning')
     arg_parser.add_argument('--ptm', type=str, choices=['bert-base-uncased', 'bert-large-uncased', 'bert-large-uncased-whole-word-masking',
         'roberta-base', 'roberta-large', 'grappa_large_jnt', 'electra-base-discriminator', 'electra-large-discriminator'], help='pretrained model name')
     arg_parser.add_argument('--add_cls', action='store_true', help='whether add [CLS] node')
@@ -48,6 +49,8 @@ def add_argument_encoder(arg_parser):
     arg_parser.add_argument('--num_heads', default=8, type=int, help='num of heads in multihead attn')
     arg_parser.add_argument('--relation_share_layers', action='store_true')
     arg_parser.add_argument('--relation_share_heads', action='store_true')
+    arg_parser.add_argument('--score_function', choices=['affine', 'bilinear', 'biaffine', 'dot'], default='affine', help='graph pruning score function')
+    arg_parser.add_argument('--ls', type=float, default=0.15, help='label smoothing factor for graph pruning')
     return arg_parser
 
 def add_argument_decoder(arg_parser):
