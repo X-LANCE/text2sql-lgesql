@@ -126,12 +126,14 @@ class EdgeUpdateLayerMetaPath(nn.Module):
     def forward(self, x, src_x, dst_x, g):
         # we do not use node feats src_x and dst_x
         q, k, v = self.affine_q(self.feat_dropout(x)), self.affine_k(self.feat_dropout(x)), self.affine_v(self.feat_dropout(x))
+        e = self.affine_n(self.feat_dropout(src_x)) if self.use_node_feat else 0
         with g.local_scope():
-            g.ndata['q'] = q.view(-1, self.num_heads, self.d_k) if not self.use_node_feat else \
-                (q + self.affine_n(self.feat_dropout(src_x))).view(-1, self.num_heads, self.d_k)
-            g.ndata['k'] = k.view(-1, self.num_heads, self.d_k)
+            g.ndata['q'] = q.view(-1, self.num_heads, self.d_k) #if not self.use_node_feat else \
+                # (q + e).view(-1, self.num_heads, self.d_k)
+            g.ndata['k'] = k.view(-1, self.num_heads, self.d_k) if not self.use_node_feat else \
+                (k + e).view(-1, self.num_heads, self.d_k)
             g.ndata['v'] = v.view(-1, self.num_heads, self.d_k) if not self.use_node_feat else \
-                (v + self.affine_n(self.feat_dropout(src_x))).view(-1, self.num_heads, self.d_k)
+                (v + e).view(-1, self.num_heads, self.d_k)
             out_x = self.propagate_attention(g)
         out_x = self.layernorm(x + self.affine_o(out_x.view(-1, self.ndim)))
         out_x = self.ffn(out_x)

@@ -101,7 +101,7 @@ class GraphFactory():
             [i for i in range(s_num) for _ in range(q_num)])
             }, num_nodes_dict={'context': q_num, 'node': s_num}, idtype=torch.int32
         )
-        t_num = len(ex['processed_table_toks'])
+        t_num = len(db['processed_table_toks'])
         def check_node(i):
             if i < t_num and i in ex['used_tables']:
                 return 1.0
@@ -137,7 +137,7 @@ class GraphFactory():
         ]
         relation_mapping_dict = {
             "*-*-identity": 'column-column-identity', "*-question": "column-question-nomatch", "question-*": "question-column-nomatch",
-            "*-table": "column-table", "table-*": "table-column", "*-column": "column-column", "column-*": "column-column"
+            "*-table": "column-table-has", "table-*": "table-column-has", "*-column": "column-column", "column-*": "column-column"
         }
         num_nodes = int(math.sqrt(len(relation)))
         edges = [(idx // num_nodes, idx % num_nodes, (relation_mapping_dict[r] if r in relation_mapping_dict else r))
@@ -159,9 +159,14 @@ class GraphFactory():
         bg.edge_feat = torch.cat([ex.edge_feat for ex in graph_list], dim=0).to(device)
         bg.context_index = torch.cat([ex.context_index for ex in graph_list], dim=0).to(device)
         bg.node_index = torch.cat([ex.node_index for ex in graph_list], dim=0).to(device)
-        bg.node_label = torch.cat([ex.node_label for ex in graph_list], dim=0).to(device)
+        smoothing = kwargs.pop('smoothing', 0.0)
+        node_label = torch.cat([ex.node_label for ex in graph_list], dim=0)
+        node_label = node_label.masked_fill_(~ node_label.bool(), 2 * smoothing) - smoothing
+        bg.node_label = node_label.to(device)
         bg.edge_index = torch.cat([ex.edge_index for ex in graph_list], dim=0).to(device)
-        bg.edge_label = torch.cat([ex.edge_label for ex in graph_list], dim=0).to(device)
+        edge_label = torch.cat([ex.edge_label for ex in graph_list], dim=0)
+        edge_label = edge_label.masked_fill_(~ edge_label.bool(), 2 * smoothing) - smoothing
+        bg.edge_label = edge_label.to(device)
         bg.gp_ng = dgl.batch([ex.gp_ng for ex in graph_list]).to(device)
         bg.gp_eg = dgl.batch([ex.gp_eg for ex in graph_list]).to(device)
         return bg

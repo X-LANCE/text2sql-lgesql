@@ -34,7 +34,8 @@ def add_argument_base(arg_parser):
 def add_argument_encoder(arg_parser):
     # Encoder Hyperparams
     arg_parser.add_argument('--model', choices=['rat', 'lgnn'], default='lgnn', help='which heterogeneous gnn model to use')
-    arg_parser.add_argument('--output_model', choices=['no_pruning', 'graph_pruning'], default='no_pruning', help='whether add graph pruning')
+    arg_parser.add_argument('--output_model', choices=['without_pruning', 'with_pruning'], default='without_pruning', help='whether add graph pruning')
+    arg_parser.add_argument('--edge_prune', action='store_true', help='whether use edge prune')
     arg_parser.add_argument('--ptm', type=str, choices=['bert-base-uncased', 'bert-large-uncased', 'bert-large-uncased-whole-word-masking',
         'roberta-base', 'roberta-large', 'grappa_large_jnt', 'electra-base-discriminator', 'electra-large-discriminator'], help='pretrained model name')
     arg_parser.add_argument('--add_cls', action='store_true', help='whether add [CLS] node')
@@ -45,12 +46,11 @@ def add_argument_encoder(arg_parser):
     arg_parser.add_argument('--embed_size', default=300, type=int, help='size of word embeddings, only used in glove.42B.300d')
     arg_parser.add_argument('--gnn_num_layers', default=8, type=int, help='num of GNN layers in encoder')
     arg_parser.add_argument('--gnn_hidden_size', default=256, type=int, help='size of GNN layers hidden states')
-    arg_parser.add_argument('--khops', default=4, type=int, help='aggregate info from k-hop neighbours')
     arg_parser.add_argument('--num_heads', default=8, type=int, help='num of heads in multihead attn')
     arg_parser.add_argument('--relation_share_layers', action='store_true')
     arg_parser.add_argument('--relation_share_heads', action='store_true')
     arg_parser.add_argument('--score_function', choices=['affine', 'bilinear', 'biaffine', 'dot'], default='affine', help='graph pruning score function')
-    arg_parser.add_argument('--ls', type=float, default=0.15, help='label smoothing factor for graph pruning')
+    arg_parser.add_argument('--smoothing', type=float, default=0.15, help='label smoothing factor for graph pruning')
     return arg_parser
 
 def add_argument_decoder(arg_parser):

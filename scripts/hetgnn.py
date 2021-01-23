@@ -78,16 +78,18 @@ if not args.testing:
     logger.info('Start training ......')
     for i in range(args.max_epoch):
         start_time = time.time()
-        epoch_loss, count = 0, 0
+        epoch_loss, epoch_gp_loss, count = 0, 0, 0
         np.random.shuffle(train_index)
         model.train()
         for j in range(0, nsamples, step_size):
             count += 1
             cur_dataset = [train_dataset[k] for k in train_index[j: j + step_size]]
-            current_batch = Batch.from_example_list(cur_dataset, device, train=True, method='hetgnn')
-            loss = model(current_batch) # see utils/batch.py for batch elements
+            current_batch = Batch.from_example_list(cur_dataset, device, train=True, method='hetgnn', smoothing=args.smoothing)
+            loss, gp_loss = model(current_batch) # see utils/batch.py for batch elements
             epoch_loss += loss.item()
+            epoch_gp_loss += gp_loss.item()
             # print("Minibatch loss: %.4f" % (loss.item()))
+            loss = loss + gp_loss
             loss.backward()
             if count == args.grad_accumulate or j + step_size >= nsamples:
                 count = 0
@@ -95,7 +97,7 @@ if not args.testing:
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
-        logger.info('Training: \tEpoch: %d\tTime: %.4f\tTraining loss: %.4f' % (i, time.time() - start_time, epoch_loss))
+        logger.info('Training: \tEpoch: %d\tTime: %.4f\tTraining loss: %.4f/%.4f' % (i, time.time() - start_time, epoch_loss, epoch_gp_loss))
         torch.cuda.empty_cache()
         gc.collect()
 

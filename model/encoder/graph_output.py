@@ -3,6 +3,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl.function as fn
 from model.model_utils import Registrable
 from model.encoder.rat import scaled_exp, div_by_z
 from model.encoder.lgnn import src_dot_dst
@@ -49,7 +50,7 @@ class ScoreFunction(nn.Module):
             raise ValueError('[Error]: Unrecognized score function method %s!' % (self.method))
         return scores
 
-@Registrable.register('no_pruning')
+@Registrable.register('without_pruning')
 class GraphOutputLayer(nn.Module):
 
     def __init__(self, args):
@@ -64,49 +65,54 @@ class GraphOutputLayer(nn.Module):
         outputs = inputs.new_zeros(len(batch), batch.mask.size(1), self.hidden_size)
         outputs = outputs.masked_scatter_(batch.mask.unsqueeze(-1), inputs)
         if self.training:
-            return outputs, batch.mask, 0.
+            return outputs, batch.mask, torch.tensor(0., dtype=torch.float).to(outputs.device)
         else:
             return outputs, batch.mask
 
-@Registrable.register('graph_pruning')
+@Registrable.register('with_pruning')
 class GraphOutputLayerWithPruning(nn.Module):
 
     def __init__(self, args):
         super(GraphOutputLayerWithPruning, self).__init__()
         self.hidden_size = args.gnn_hidden_size
-        self.graph_pruning = GraphPruning(self.hidden_size, args.num_heads, args.feat_drop, args.score_function)
-    
+        self.graph_pruning = GraphPruning(self.hidden_size, args.num_heads, args.dropout, args.score_function, args.edge_prune)
+
     def forward(self, inputs, lg_inputs, batch):
         outputs = inputs.new_zeros(len(batch), batch.mask.size(1), self.hidden_size)
         outputs = outputs.masked_scatter_(batch.mask.unsqueeze(-1), inputs)
 
         if self.training:
             # extract context, node and edge feats
-            context = inputs.masked_select(batch.context_index.unsqueeze(-1)).view(-1, self.hidden_size)
-            node = inputs.masked_select(batch.node_index.unsqueeze(-1)).view(-1, self.hidden_size)
-            edge = lg_inputs.masked_select(batch.edge_index.unsqueeze(-1)).view(-1, self.hidden_size)
-            loss = self.graph_pruning(context, node, edge, batch.gp_ng, batch.gp_eg, batch.node_label, batch.edge_label)
+            g = batch.graph
+            context = inputs.masked_select(g.context_index.unsqueeze(-1)).view(-1, self.hidden_size)
+            node = inputs.masked_select(g.node_index.unsqueeze(-1)).view(-1, self.hidden_size)
+            edge = lg_inputs.masked_select(g.edge_index.unsqueeze(-1)).view(-1, self.hidden_size)
+            loss = self.graph_pruning(context, node, edge, g.gp_ng, g.gp_eg, g.node_label, g.edge_label)
             return outputs, batch.mask, loss
         else:
             return outputs, batch.mask
 
 class GraphPruning(nn.Module):
 
-    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2, score_function='affine'):
+    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2, score_function='affine', edge_prune=True):
         super(GraphPruning, self).__init__()
         self.hidden_size = hidden_size
         self.node_mha = DGLMHA(hidden_size, num_heads, feat_drop)
-        self.edge_mha = DGLMHA(hidden_size, num_heads, feat_drop)
         self.node_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
-        self.edge_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
+        self.edge_prune = edge_prune
+        if self.edge_prune:
+            self.edge_mha = DGLMHA(hidden_size, num_heads, feat_drop)
+            self.edge_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
         self.loss_function = nn.BCEWithLogitsLoss(reduction='sum')
 
     def forward(self, context, node, edge, ng, eg, nl, el):
         node_context = self.node_mha(context, node, ng)
-        edge_context = self.edge_mha(context, edge, eg)
         node_score = self.node_score_function(node_context, node)
-        edge_score = self.edge_score_function(edge_context, edge)
-        loss = self.loss_function(node_score, nl), self.loss_function(edge_score, el)
+        loss = self.loss_function(node_score, nl)
+        if self.edge_prune:
+            edge_context = self.edge_mha(context, edge, eg)
+            edge_score = self.edge_score_function(edge_context, edge)
+            loss += self.loss_function(edge_score, el)
         return loss
 
 class DGLMHA(nn.Module):
@@ -129,7 +135,7 @@ class DGLMHA(nn.Module):
             g.nodes['context'].data['k'] = k.view(-1, self.num_heads, self.d_k)
             g.nodes['context'].data['v'] = v.view(-1, self.num_heads, self.d_k)
             out_x = self.propagate_attention(g)
-        return out_x
+        return self.affine_o(out_x.view(-1, self.hidden_size))
 
     def propagate_attention(self, g):
         # Compute attention score
