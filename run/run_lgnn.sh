@@ -1,12 +1,12 @@
-task=lgnn_rataffine_src
+task=lgnn_q_v_src
 seed=999
 device=0
 testing='' #'--testing'
 read_model_path='' #'--read_model_path exp/ratsql/emb_300__gnn_256_x_8__head_8__dp_0.2__attndp_0.0__cell_onlstm_512_x_1_chunk_8__attvec_512__jointcxt_no__ae_128__fe_64__te_64__init_0.2__bsize_20__lr_0.0005__l2_0.0001__warmup_0.1__schedule_linear__me_100__mn_5.0__beam_5/'
 
 model=lgnn
-output_model=with_pruning # without_pruning
-edge_prune='--edge_prune'
+output_model=without_pruning # without_pruning
+edge_prune=''
 add_cls=''
 ptm="--ptm electra-base-discriminator"
 embed_size=300

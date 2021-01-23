@@ -1,10 +1,11 @@
 #coding=utf8
 import os, sqlite3
 import numpy as np
-import stanza
+import stanza, torch, dgl, math
 from nltk.corpus import stopwords
 from itertools import product, combinations
 from utils.constants import MAX_RELATIVE_DIST
+from utils.graph_utils import GraphExample
 
 def is_number(s):
     try:
@@ -335,3 +336,90 @@ class Preprocessor():
             print('Partial match:', ', '.join(column_matched_pairs['partial']) if column_matched_pairs['partial'] else 'empty')
             print('Value match:', ', '.join(column_matched_pairs['value']) if column_matched_pairs['value'] else 'empty', '\n')
         return entry
+
+    def prepare_graph(self, ex: dict, db: dict):
+        """ Example should be preprocessed by self.pipeline
+        """
+        q = np.array(ex['relations'], dtype='<U100')
+        s = np.array(db['relations'], dtype='<U100')
+        q_s = np.array(ex['schema_linking'][0], dtype='<U100')
+        s_q = np.array(ex['schema_linking'][1], dtype='<U100')
+        relation = np.concatenate([
+            np.concatenate([q, q_s], axis=1),
+            np.concatenate([s_q, s], axis=1)
+        ], axis=0)
+        relation = relation.flatten().tolist()
+
+        filter_relations = [
+            'question-question', 'table-table', 'column-column', 'table-column', 'column-table',
+            'question-question-dist-2', 'question-question-dist2'
+            'table-table-fk', 'table-table-fkr', 'table-table-fkb', 'column-column-sametable',
+            '*-column', 'column-*',
+            # '*-table', 'table-*',
+            # 'table-question-nomatch', 'question-table-nomatch', 'column-question-nomatch', 'question-column-nomatch', 'question-*', '*-question',
+            'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity', '*-*-identity'
+        ]
+        # filter some relations to avoid too many nodes in the line graph
+        relation_mapping_dict = {
+            'question-*': 'question-column-nomatch',
+            '*-question': 'column-question-nomatch',
+            'table-*': 'table-column-has',
+            '*-table': 'column-table-has',
+            '*-column': 'column-column',
+            'column-*': 'column-column',
+            '*-*-identity': 'column-column-identity'
+        }
+        graph = GraphExample()
+        num_nodes = int(math.sqrt(len(relation)))
+        edges = [(idx // num_nodes, idx % num_nodes, (relation_mapping_dict[r] if r in relation_mapping_dict else r))
+            for idx, r in enumerate(relation) if r not in filter_relations]
+        graph.edges = edges
+        extra_edges = [(idx // num_nodes, idx % num_nodes, (relation_mapping_dict[r] if r in relation_mapping_dict else r))
+            for idx, r in enumerate(relation) if r in filter_relations]
+        full_edges = edges + extra_edges
+        src_ids, dst_ids = list(map(lambda r: r[0], full_edges)), list(map(lambda r: r[1], full_edges))
+        graph.full_edges = full_edges
+        graph.full_g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)
+        num_edges = len(edges)
+        src_ids, dst_ids = list(map(lambda r: r[0], edges)), list(map(lambda r: r[1], edges))
+
+        graph.g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)
+        lg = graph.g.line_graph(backtracking=False)
+        match_ids = [idx for idx, r in enumerate(edges) if 'match' in r[2]]
+        src, dst, eids = lg.edges(form='all', order='eid')
+        eids = [e for u, v, e in zip(src.tolist(), dst.tolist(), eids.tolist()) if not (u in match_ids and v in match_ids)]
+        graph.lg = lg.edge_subgraph(eids, preserve_nodes=True).remove_self_loop().add_self_loop()
+
+        # graph pruning for nodes
+        q_num = len(ex['processed_question_toks'])
+        s_num = num_nodes - q_num
+        graph.context_index = [1] * q_num + [0] * s_num
+        graph.node_index = [0] * q_num + [1] * s_num
+        graph.gp_ng = dgl.heterograph({
+            ('context', 'to', 'node'): (list(range(q_num)) * s_num,
+            [i for i in range(s_num) for _ in range(q_num)])
+            }, num_nodes_dict={'context': q_num, 'node': s_num}, idtype=torch.int32
+        )
+        t_num = len(db['processed_table_toks'])
+        def check_node(i):
+            if i < t_num and i in ex['used_tables']:
+                return 1.0
+            elif i >= t_num and i - t_num in ex['used_columns']:
+                return 1.0
+            else: return 0.0
+        graph.node_label = list(map(check_node, range(s_num)))
+
+        # graph pruning for edges
+        graph.edge_index = list(map(lambda e: 1 if e[0] >= q_num and e[1] >= q_num else 0, edges))
+        e_num = sum(graph.edge_index)
+        graph.gp_eg = dgl.heterograph({
+            ('context', 'to', 'node'): (list(range(q_num)) * e_num,
+            [i for i in range(e_num) for _ in range(q_num)])
+            }, num_nodes_dict={'context': q_num, 'node': e_num}, idtype=torch.int32
+        )
+        def check_edge(t):
+            if check_node(t[0]) + check_node(t[1]) > 1.5:
+                return 1.0
+            else: return 0.0
+        graph.edge_label = list(map(check_edge, filter(lambda e: e[0] >= q_num and e[1] >= q_num, edges)))
+        return graph

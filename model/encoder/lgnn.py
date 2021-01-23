@@ -116,8 +116,8 @@ class EdgeUpdateLayerMetaPath(nn.Module):
         self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.edim, self.ndim), \
             nn.Linear(self.edim, self.ndim, bias=False), nn.Linear(self.edim, self.ndim, bias=False)
         self.use_node_feat = use_node_feat
-        if self.use_node_feat:
-            self.affine_n = nn.Linear(self.ndim, self.ndim)
+        # if self.use_node_feat:
+            # self.affine_n = nn.Linear(self.ndim, self.ndim)
         self.affine_o = nn.Linear(self.ndim, self.edim)
         self.layernorm = nn.LayerNorm(self.edim)
         self.feat_dropout = nn.Dropout(p=feat_drop)
@@ -126,14 +126,16 @@ class EdgeUpdateLayerMetaPath(nn.Module):
     def forward(self, x, src_x, dst_x, g):
         # we do not use node feats src_x and dst_x
         q, k, v = self.affine_q(self.feat_dropout(x)), self.affine_k(self.feat_dropout(x)), self.affine_v(self.feat_dropout(x))
-        e = self.affine_n(self.feat_dropout(src_x)) if self.use_node_feat else 0
+        # e = self.affine_n(self.feat_dropout(src_x)) if self.use_node_feat else 0
+        ek = src_x if self.use_node_feat else 0
+        ev = src_x if self.use_node_feat else 0
         with g.local_scope():
-            g.ndata['q'] = q.view(-1, self.num_heads, self.d_k) #if not self.use_node_feat else \
-                # (q + e).view(-1, self.num_heads, self.d_k)
-            g.ndata['k'] = k.view(-1, self.num_heads, self.d_k) if not self.use_node_feat else \
-                (k + e).view(-1, self.num_heads, self.d_k)
+            g.ndata['q'] = q.view(-1, self.num_heads, self.d_k) if not self.use_node_feat else \
+                (q + ek).view(-1, self.num_heads, self.d_k)
+            g.ndata['k'] = k.view(-1, self.num_heads, self.d_k) #if not self.use_node_feat else \
+                # (k + ek).view(-1, self.num_heads, self.d_k)
             g.ndata['v'] = v.view(-1, self.num_heads, self.d_k) if not self.use_node_feat else \
-                (v + e).view(-1, self.num_heads, self.d_k)
+                (v + ev).view(-1, self.num_heads, self.d_k)
             out_x = self.propagate_attention(g)
         out_x = self.layernorm(x + self.affine_o(out_x.view(-1, self.ndim)))
         out_x = self.ffn(out_x)

@@ -39,8 +39,8 @@ class RATLayer(nn.Module):
         self.d_k = self.ndim // self.num_heads
         self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.ndim, self.ndim),\
             nn.Linear(self.ndim, self.ndim, bias=False), nn.Linear(self.ndim, self.ndim, bias=False)
-        self.affine_ke = nn.Linear(self.edim, self.ndim)
-        self.affine_ve = nn.Linear(self.edim, self.ndim)
+        # self.affine_ke = nn.Linear(self.edim, self.ndim)
+        # self.affine_ve = nn.Linear(self.edim, self.ndim)
         self.affine_o = nn.Linear(self.ndim, self.ndim)
         self.layernorm = nn.LayerNorm(self.ndim)
         self.feat_dropout = nn.Dropout(p=feat_drop)
@@ -55,15 +55,14 @@ class RATLayer(nn.Module):
         # pre-mapping q/k/v affine
         q, k, v = self.affine_q(self.feat_dropout(x)), self.affine_k(self.feat_dropout(x)), self.affine_v(self.feat_dropout(x))
         # e = self.affine_e(self.feat_dropout(lg_x))
-        e_k = self.affine_ke(self.feat_dropout(lg_x))
-        e_v = self.affine_ve(self.feat_dropout(lg_x))
-        # e = self.feat_dropout(lg_x).view(-1, self.num_heads, self.d_k) if lg_x.size(-1) == q.size(-1) else \
-            # self.feat_dropout(lg_x).unsqueeze(1).expand(-1, self.num_heads, -1)
+        # e_k = self.affine_ke(self.feat_dropout(lg_x))
+        # e_v = self.affine_ve(self.feat_dropout(lg_x))
+        e = lg_x.view(-1, self.num_heads, self.d_k) if lg_x.size(-1) == q.size(-1) else \
+            lg_x.unsqueeze(1).expand(-1, self.num_heads, -1)
         with g.local_scope():
             g.ndata['q'], g.ndata['k'] = q.view(-1, self.num_heads, self.d_k), k.view(-1, self.num_heads, self.d_k)
             g.ndata['v'] = v.view(-1, self.num_heads, self.d_k)
-            g.edata['ke'] = e_k.view(-1, self.num_heads, self.d_k)
-            g.edata['ve'] = e_v.view(-1, self.num_heads, self.d_k)
+            g.edata['e'] = e
             out_x = self.propagate_attention(g)
 
         out_x = self.layernorm(x + self.affine_o(out_x.view(-1, self.ndim)))
@@ -72,10 +71,10 @@ class RATLayer(nn.Module):
 
     def propagate_attention(self, g):
         # Compute attention score
-        g.apply_edges(src_sum_edge_mul_dst('k', 'q', 'ke', 'score'))
+        g.apply_edges(src_sum_edge_mul_dst('k', 'q', 'e', 'score'))
         g.apply_edges(scaled_exp('score', math.sqrt(self.d_k)))
         # Update node state
-        g.update_all(src_sum_edge_mul_edge('v', 've', 'score', 'v'), fn.sum('v', 'wv'))
+        g.update_all(src_sum_edge_mul_edge('v', 'e', 'score', 'v'), fn.sum('v', 'wv'))
         # g.update_all(fn.src_mul_edge('v', 'score', 'v'), fn.sum('v', 'wv'))
         g.update_all(fn.copy_edge('score', 'score'), fn.sum('score', 'z'), div_by_z('wv', 'z', 'o'))
         out_x = g.ndata['o']

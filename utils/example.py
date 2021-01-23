@@ -14,7 +14,7 @@ from utils.evaluator import Evaluator
 class Example():
 
     @classmethod
-    def configuration(cls, ptm=None, method='lgnn', table_path='data/tables.bin', add_cls=False):
+    def configuration(cls, ptm=None, method='lgnn', table_path='data/tables.bin', add_cls=False, fast=True):
         cls.ptm = ptm
         cls.grammar = ASDLGrammar.from_filepath(GRAMMAR_FILEPATH)
         cls.trans = TransitionSystem.get_class_by_lang('sql')(cls.grammar)
@@ -30,12 +30,14 @@ class Example():
             cls.word_vocab = cls.tokenizer.get_vocab()
         cls.add_cls = add_cls # whether add special CLS node
         cls.relation_vocab = Vocab(padding=False, unk=False, boundary=False, iterable=RELATIONS, default=None)
+        cls.fast = fast
         cls.graph_factory = GraphFactory(method, cls.add_cls, cls.relation_vocab)
 
     @classmethod
     def load_dataset(cls, choice, debug=False):
         assert choice in ['train', 'dev']
-        fp = os.path.join('data', choice + '.bin')
+        fp = os.path.join('data', choice + '.dgl.bin') if cls.fast else \
+            os.path.join('data', choice + '.bin')
         datasets = pickle.load(open(fp, 'rb'))
         # question_lens = [len(ex['processed_question_toks']) for ex in datasets]
         # print('Max/Min/Avg question length in %s dataset is: %d/%d/%.2f' % (choice, max(question_lens), min(question_lens), float(sum(question_lens))/len(question_lens)))
@@ -138,7 +140,7 @@ class Example():
             self.table_mask_ptm = [0] * len(self.question_id) + self.table_mask_ptm + [0] * len(self.column_id)
             self.column_mask_ptm = [0] * (len(self.question_id) + len(self.table_id)) + self.column_mask_ptm
 
-        self.graph = Example.graph_factory.graph_construction(ex, db)
+        self.graph = Example.graph_factory.graph_construction(ex, db, fast=Example.fast)
 
         # outputs
         self.ast = ex['ast']

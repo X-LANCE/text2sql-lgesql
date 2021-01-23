@@ -23,10 +23,13 @@ class GraphFactory():
     def __init__(self, method='lgnn', add_cls=True, relation_vocab=None):
         super(GraphFactory, self).__init__()
         self.method = eval('self.' + method)
+        self.fast_method = eval('self.fast_' + method)
         self.batch_method = eval('self.batch_' + method)
         self.add_cls, self.relation_vocab = add_cls, relation_vocab
 
-    def graph_construction(self, ex: dict, db: dict):
+    def graph_construction(self, ex: dict, db: dict, fast: bool = False):
+        if fast:
+            return self.fast_method(ex, db)
         """ Wrapper function """
         q = np.array(ex['relations'], dtype='<U100')
         s = np.array(db['relations'], dtype='<U100')
@@ -51,9 +54,19 @@ class GraphFactory():
         relation = relation.flatten().tolist()
         return self.method(ex, db, relation)
 
-    def batch_graphs(self, ex_list, device, train=True, **kwargs):
-        """ Batch graphs in example list """
-        return self.batch_method(ex_list, device, train=train, **kwargs)
+    def fast_lgnn(self, ex, db):
+        graph = GraphExample()
+        edges = ex['graph'].edges
+        rel_ids = list(map(lambda r: self.relation_vocab[r[2]], edges))
+        graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
+        graph.g, graph.lg = ex['graph'].g, ex['graph'].lg
+        graph.gp_ng, graph.gp_eg = ex['graph'].gp_ng, ex['graph'].gp_eg
+        graph.context_index = torch.tensor(ex['graph'].context_index, dtype=torch.bool)
+        graph.node_index = torch.tensor(ex['graph'].node_index, dtype=torch.bool)
+        graph.edge_index = torch.tensor(ex['graph'].edge_index, dtype=torch.bool)
+        graph.node_label = torch.tensor(ex['graph'].node_label, dtype=torch.float)
+        graph.edge_label = torch.tensor(ex['graph'].edge_label, dtype=torch.float)
+        return graph
 
     def lgnn(self, ex, db, relation):
         # we only allow edge flow to *, no edge start with *
@@ -150,6 +163,10 @@ class GraphFactory():
         graph.g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)
         graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
         return graph
+
+    def batch_graphs(self, ex_list, device, train=True, **kwargs):
+        """ Batch graphs in example list """
+        return self.batch_method(ex_list, device, train=train, **kwargs)
 
     def batch_lgnn(self, ex_list, device, train=True, **kwargs):
         graph_list = [ex.graph for ex in ex_list]
