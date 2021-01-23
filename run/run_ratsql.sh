@@ -1,4 +1,4 @@
-task=ratsql_edge_noaffine_samedropout
+task=ratsql_edge_diffaffine
 seed=999
 device=0
 testing='' #'--testing'
@@ -14,7 +14,7 @@ schema_aggregation=head+tail
 gnn_hidden_size=512
 gnn_num_layers=8
 relation_share_layers=$1 #'--relation_share_layers'
-relation_share_heads='--relation_share_heads'
+relation_share_heads=$2 #'--relation_share_heads'
 score_function='affine'
 num_heads=8
 dropout=0.2
