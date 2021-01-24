@@ -33,7 +33,7 @@ def add_argument_base(arg_parser):
 
 def add_argument_encoder(arg_parser):
     # Encoder Hyperparams
-    arg_parser.add_argument('--model', choices=['rat', 'lgnn', 'lgnn_plus_rat'], default='lgnn', help='which heterogeneous gnn model to use')
+    arg_parser.add_argument('--model', choices=['rat', 'lgnn', 'lgnn_plus_rat', 'lgnn_concat_rat'], default='lgnn', help='which heterogeneous gnn model to use')
     arg_parser.add_argument('--output_model', choices=['without_pruning', 'with_pruning'], default='without_pruning', help='whether add graph pruning')
     arg_parser.add_argument('--edge_prune', action='store_true', help='whether use edge prune')
     arg_parser.add_argument('--ptm', type=str, choices=['bert-base-uncased', 'bert-large-uncased', 'bert-large-uncased-whole-word-masking',
