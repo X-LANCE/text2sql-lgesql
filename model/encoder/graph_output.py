@@ -75,7 +75,7 @@ class GraphOutputLayerWithPruning(nn.Module):
     def __init__(self, args):
         super(GraphOutputLayerWithPruning, self).__init__()
         self.hidden_size = args.gnn_hidden_size
-        self.graph_pruning = GraphPruning(self.hidden_size, args.num_heads, args.dropout, args.score_function, args.edge_prune)
+        self.graph_pruning = GraphPruning(self.hidden_size, args.num_heads, args.dropout, args.score_function, args.edge_prune, args.relation_share_heads)
 
     def forward(self, inputs, lg_inputs, batch):
         outputs = inputs.new_zeros(len(batch), batch.mask.size(1), self.hidden_size)
@@ -86,7 +86,7 @@ class GraphOutputLayerWithPruning(nn.Module):
             g = batch.graph
             context = inputs.masked_select(g.context_index.unsqueeze(-1)).view(-1, self.hidden_size)
             node = inputs.masked_select(g.node_index.unsqueeze(-1)).view(-1, self.hidden_size)
-            edge = lg_inputs.masked_select(g.edge_index.unsqueeze(-1)).view(-1, self.hidden_size)
+            edge = lg_inputs.masked_select(g.edge_index.unsqueeze(-1)).view(-1, lg_inputs.size(-1))
             loss = self.graph_pruning(context, node, edge, g.gp_ng, g.gp_eg, g.node_label, g.edge_label)
             return outputs, batch.mask, loss
         else:
@@ -94,15 +94,16 @@ class GraphOutputLayerWithPruning(nn.Module):
 
 class GraphPruning(nn.Module):
 
-    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2, score_function='affine', edge_prune=True):
+    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2, score_function='affine', edge_prune=True, relation_share_heads=True):
         super(GraphPruning, self).__init__()
         self.hidden_size = hidden_size
-        self.node_mha = DGLMHA(hidden_size, num_heads, feat_drop)
+        self.node_mha = DGLMHA(hidden_size, hidden_size, num_heads, feat_drop)
         self.node_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
         self.edge_prune = edge_prune
         if self.edge_prune:
-            self.edge_mha = DGLMHA(hidden_size, num_heads, feat_drop)
-            self.edge_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
+            edim = hidden_size // num_heads if relation_share_heads else hidden_size
+            self.edge_mha = DGLMHA(hidden_size, edim, num_heads, feat_drop)
+            self.edge_score_function = ScoreFunction(edim, mlp=2, method=score_function)
         self.loss_function = nn.BCEWithLogitsLoss(reduction='sum')
 
     def forward(self, context, node, edge, ng, eg, nl, el):
@@ -118,14 +119,15 @@ class GraphPruning(nn.Module):
 class DGLMHA(nn.Module):
     """ Multi-head attention implemented with DGL lib
     """
-    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2):
+    def __init__(self, hidden_size, output_size, num_heads=8, feat_drop=0.2):
         super(DGLMHA, self).__init__()
         self.hidden_size = hidden_size
+        self.output_size = output_size
         self.num_heads = num_heads
         self.d_k = self.hidden_size // self.num_heads
-        self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.hidden_size, self.hidden_size),\
+        self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.output_size, self.hidden_size),\
             nn.Linear(self.hidden_size, self.hidden_size, bias=False), nn.Linear(self.hidden_size, self.hidden_size, bias=False)
-        self.affine_o = nn.Linear(self.hidden_size, self.hidden_size)
+        self.affine_o = nn.Linear(self.hidden_size, self.output_size)
         self.feat_dropout = nn.Dropout(p=feat_drop)
 
     def forward(self, context, node, g):

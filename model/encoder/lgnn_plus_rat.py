@@ -8,22 +8,22 @@ from model.model_utils import Registrable, MultiHeadAttention, FFN
 from model.encoder.rat import RATLayer as NodeUpdateLayer
 from model.encoder.rat import scaled_exp, div_by_z
 
-@Registrable.register('lgnn')
-class LGNN(nn.Module):
+@Registrable.register('lgnn_plus_rat')
+class LGNNPlusRAT(nn.Module):
     """ Compared with RAT, we utilize a line graph to explicitly model the propagation among edges:
     1. aggregate info from nearby edges via GCN/GAT
     2. aggregate info from src and dst nodes
     """
     def __init__(self, args):
-        super(LGNN, self).__init__()
+        super(LGNNPlusRAT, self).__init__()
         self.num_layers = args.gnn_num_layers
         self.relation_num = args.relation_num
         self.relation_share_heads = args.relation_share_heads
         self.ndim = args.gnn_hidden_size # node feature dim
         # we pay more attention to node feats, thus could share edge feats in multi-heads to reduce dimension
         self.edim = args.gnn_hidden_size // args.num_heads if self.relation_share_heads else args.gnn_hidden_size
-        self.relation_embed = nn.Embedding(self.relation_num, self.edim)
-        self.gnn_layers = nn.ModuleList([LGNNLayer(self.ndim, self.edim, num_heads=args.num_heads, feat_drop=args.dropout)
+        self.relation_embed = nn.Embedding(self.relation_num, self.edim) # contain global relations
+        self.gnn_layers = nn.ModuleList([LGNNPlusRATLayer(self.ndim, self.edim, num_heads=args.num_heads, feat_drop=args.dropout)
             for _ in range(self.num_layers)])
 
     def forward(self, x, batch):
@@ -33,10 +33,10 @@ class LGNN(nn.Module):
             x, lg_x = self.gnn_layers[i](x, lg_x, batch.graph.g, batch.graph.lg, src_ids.long(), dst_ids.long())
         return x, lg_x
 
-class LGNNLayer(nn.Module):
+class LGNNPlusRATLayer(nn.Module):
 
     def __init__(self, ndim, edim, num_heads=8, feat_drop=0.2):
-        super(LGNNLayer, self).__init__()
+        super(LGNNPlusRATLayer, self).__init__()
         self.ndim, self.edim = ndim, edim
         self.num_heads = num_heads
         self.node_update = NodeUpdateLayer(self.ndim, self.edim, self.num_heads, feat_drop)

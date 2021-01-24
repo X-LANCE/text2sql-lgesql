@@ -54,6 +54,15 @@ class GraphFactory():
         relation = relation.flatten().tolist()
         return self.method(ex, db, relation)
 
+    def fast_lgnn_plus_rat(self, ex, db):
+        graph = self.fast_lgnn(ex, db)
+        full_edge_feat = list(map(lambda r: self.relation_vocab[r[2]], ex['graph'].full_edges))
+        graph.full_edge_feat = torch.tensor(full_edge_feat, dtype=torch.long)
+        graph.full_g = ex['graph'].full_g
+        local_enum, global_enum = graph.edge_feat.size(0), graph.full_edge_feat.size(0)
+        graph.local_index = torch.tensor([1] * local_enum + [0] * global_enum, dtype=torch.bool)
+        return graph
+
     def fast_lgnn(self, ex, db):
         graph = GraphExample()
         edges = ex['graph'].edges
@@ -167,6 +176,13 @@ class GraphFactory():
     def batch_graphs(self, ex_list, device, train=True, **kwargs):
         """ Batch graphs in example list """
         return self.batch_method(ex_list, device, train=train, **kwargs)
+
+    def batch_lgnn_plus_rat(self, ex_list, device, train=True, **kwargs):
+        bg = self.batch_lgnn(ex_list, device, train=True, **kwargs)
+        bg.full_edge_feat = torch.cat([ex.graph.full_edge_feat for ex in ex_list], dim=0).to(device)
+        bg.full_g = dgl.batch([ex.graph.full_g for ex in ex_list]).to(device)
+        bg.local_index = torch.cat([ex.graph.local_index for ex in ex_list], dim=0).to(device)
+        return bg
 
     def batch_lgnn(self, ex_list, device, train=True, **kwargs):
         graph_list = [ex.graph for ex in ex_list]
