@@ -4,6 +4,7 @@ import torch.nn as nn
 from model.encoder.graph_input import *
 from model.encoder.lgnn import LGNN
 from model.encoder.rat import RAT
+from model.encoder.lgnn_plus_rat import LGNNPlusRAT
 from model.encoder.graph_output import *
 from model.model_utils import Registrable
 

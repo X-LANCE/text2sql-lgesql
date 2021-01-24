@@ -1,14 +1,6 @@
 #coding=utf8
 import numpy as np
 import dgl, torch, math
-from scipy.sparse import coo_matrix, block_diag
-import time
-
-def sparse2th(mat):
-    value = mat.data
-    indices = torch.LongTensor([mat.row, mat.col])
-    tensor = torch.sparse.FloatTensor(indices, torch.from_numpy(value).float(), mat.shape)
-    return tensor
 
 class GraphExample():
 
@@ -56,11 +48,13 @@ class GraphFactory():
 
     def fast_lgnn_plus_rat(self, ex, db):
         graph = self.fast_lgnn(ex, db)
+        # update node graph to a complete graph
         full_edge_feat = list(map(lambda r: self.relation_vocab[r[2]], ex['graph'].full_edges))
-        graph.full_edge_feat = torch.tensor(full_edge_feat, dtype=torch.long)
-        graph.full_g = ex['graph'].full_g
+        graph.edge_feat = torch.tensor(full_edge_feat, dtype=torch.long)
+        graph.g = ex['graph'].full_g
+        # add extra field local index to extract and scatter local relation feats
         local_enum, global_enum = graph.edge_feat.size(0), graph.full_edge_feat.size(0)
-        graph.local_index = torch.tensor([1] * local_enum + [0] * global_enum, dtype=torch.bool)
+        graph.local_index = torch.tensor([1] * local_enum + [0] * (global_enum - local_enum), dtype=torch.bool)
         return graph
 
     def fast_lgnn(self, ex, db):
@@ -179,8 +173,6 @@ class GraphFactory():
 
     def batch_lgnn_plus_rat(self, ex_list, device, train=True, **kwargs):
         bg = self.batch_lgnn(ex_list, device, train=True, **kwargs)
-        bg.full_edge_feat = torch.cat([ex.graph.full_edge_feat for ex in ex_list], dim=0).to(device)
-        bg.full_g = dgl.batch([ex.graph.full_g for ex in ex_list]).to(device)
         bg.local_index = torch.cat([ex.graph.local_index for ex in ex_list], dim=0).to(device)
         return bg
 
