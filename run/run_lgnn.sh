@@ -1,4 +1,4 @@
-task=lgnn_q_v_src
+task=lgnn_qkv
 seed=999
 device=0
 testing='' #'--testing'
@@ -13,14 +13,17 @@ embed_size=300
 subword_aggregation=attentive-pooling
 schema_aggregation=head+tail
 gnn_hidden_size=512
-gnn_num_layers=8
+gnn_num_layers=4
 relation_share_layers='--relation_share_layers'
-relation_share_heads=''
+relation_share_heads=$4
 score_function='affine'
 num_heads=8
 dropout=0.2
 attn_drop=0.0
 drop_connect=0.2
+q=$1
+k=$2
+v=$3
 
 lstm=onlstm
 chunk_size=8
@@ -39,7 +42,7 @@ no_parent_state=''
 
 decode_max_step=100
 batch_size=20
-grad_accumulate=5
+grad_accumulate=10
 lr=2e-4
 layerwise_decay=0.8
 l2=0.1
@@ -53,6 +56,7 @@ beam_size=5
 
 python scripts/hetgnn.py --task $task --seed $seed --device $device $testing $read_model_path \
     $ptm --gnn_hidden_size $gnn_hidden_size --dropout $dropout --attn_drop $attn_drop --att_vec_size $att_vec_size \
+    --q $q --k $k --v $v \
     --model $model --output_model $output_model $edge_prune --score_function $score_function $add_cls $relation_share_layers $relation_share_heads \
     --subword_aggregation $subword_aggregation --schema_aggregation $schema_aggregation --embed_size $embed_size --gnn_num_layers $gnn_num_layers --num_heads $num_heads $sep_cxt \
     --lstm $lstm --chunk_size $chunk_size --drop_connect $drop_connect --lstm_hidden_size $lstm_hidden_size --lstm_num_layers $lstm_num_layers --decode_max_step $decode_max_step \
