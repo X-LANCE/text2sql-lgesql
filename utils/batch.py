@@ -174,11 +174,7 @@ class Batch():
     def max_column_subword_len(self):
         return torch.max(self.column_subword_lens).item()
 
-    # @cached_property
-    # def mask(self):
-        # return lens2mask(self.lens)
-
-    """ split means different types of nodes are seperated instead of concatenated together """
+    """ Different types of nodes are seperated instead of concatenated together """
     @cached_property
     def mask(self):
         return torch.cat([self.question_mask, self.table_mask, self.column_mask], dim=1)
