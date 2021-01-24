@@ -132,7 +132,7 @@ class EdgeUpdateLayerMetaPath(nn.Module):
         # e = self.affine_n(self.feat_dropout(src_x)) if self.use_node_feat else 0
         eq = src_x if self.q == 'src' else dst_x if self.q == 'dst' else 0
         ek = src_x if self.k == 'src' else 0
-        ev = src_x if self.v == 'src' else dst_x
+        ev = src_x if self.v == 'src' else dst_x if self.v == 'dst' else 0
         with g.local_scope():
             g.ndata['q'] = (q + eq).view(-1, self.num_heads, self.d_k)
             g.ndata['k'] = (k + ek).view(-1, self.num_heads, self.d_k)
