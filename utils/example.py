@@ -34,7 +34,7 @@ class Example():
         cls.graph_factory = GraphFactory(method, cls.add_cls, cls.relation_vocab)
 
     @classmethod
-    def load_dataset(cls, choice, debug=False):
+    def load_dataset(cls, choice, debug=True):
         assert choice in ['train', 'dev']
         fp = os.path.join('data', choice + '.dgl.bin') if cls.fast else \
             os.path.join('data', choice + '.bin')

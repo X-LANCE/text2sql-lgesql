@@ -14,7 +14,7 @@ class GraphFactory():
 
     def __init__(self, method='lgnn', add_cls=True, relation_vocab=None):
         super(GraphFactory, self).__init__()
-        self.method = eval('self.' + method)
+        # self.method = eval('self.' + method)
         self.fast_method = eval('self.fast_' + method)
         self.batch_method = eval('self.batch_' + method)
         self.add_cls, self.relation_vocab = add_cls, relation_vocab
@@ -49,9 +49,9 @@ class GraphFactory():
     def fast_lgnn_plus_rat(self, ex, db):
         graph = self.fast_lgnn(ex, db)
         # update node graph to a complete graph
+        graph.full_g = ex['graph'].full_g
         full_edge_feat = list(map(lambda r: self.relation_vocab[r[2]], ex['graph'].full_edges))
-        graph.edge_feat = torch.tensor(full_edge_feat, dtype=torch.long)
-        graph.g = ex['graph'].full_g
+        graph.full_edge_feat = torch.tensor(full_edge_feat, dtype=torch.long)
         # add extra field local index to extract and scatter local relation feats
         local_enum, global_enum = graph.edge_feat.size(0), graph.full_edge_feat.size(0)
         graph.local_index = torch.tensor([1] * local_enum + [0] * (global_enum - local_enum), dtype=torch.bool)
@@ -180,14 +180,18 @@ class GraphFactory():
         return self.batch_method(ex_list, device, train=train, **kwargs)
 
     def batch_lgnn_plus_rat(self, ex_list, device, train=True, **kwargs):
-        bg = self.batch_lgnn(ex_list, device, train=True, **kwargs)
+        bg = self.batch_lgnn(ex_list, device, train=train, **kwargs)
+        src_ids, dst_ids = bg.g.edges(order='eid')
+        bg.src_ids, bg.dst_ids = src_ids.long(), dst_ids.long()
+        bg.g = dgl.batch([ex.graph.full_g for ex in ex_list]).to(device)
+        bg.edge_feat = torch.cat([ex.graph.full_edge_feat for ex in ex_list], dim=0).to(device)
         bg.local_index = torch.cat([ex.graph.local_index for ex in ex_list], dim=0).to(device)
         return bg
 
     def batch_lgnn_concat_rat(self, ex_list, device, train=True, **kwargs):
-        bg = self.batch_lgnn(ex_list, device, train=True, **kwargs)
-        bg.full_edge_feat = torch.cat([ex.graph.full_edge_feat for ex in ex_list], dim=0).to(device)
+        bg = self.batch_lgnn(ex_list, device, train=train, **kwargs)
         bg.full_g = dgl.batch([ex.graph.full_g for ex in ex_list]).to(device)
+        bg.full_edge_feat = torch.cat([ex.graph.full_edge_feat for ex in ex_list], dim=0).to(device)
         return bg
 
     def batch_lgnn(self, ex_list, device, train=True, **kwargs):

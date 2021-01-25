@@ -16,6 +16,7 @@ class LGNNConcatRAT(nn.Module):
         super(LGNNConcatRAT, self).__init__()
         self.num_layers = args.gnn_num_layers
         self.relation_num = args.relation_num
+        self.relation_share_layers = args.relation_share_layers
         self.relation_share_heads = args.relation_share_heads
         self.ndim = args.gnn_hidden_size # node feature dim
         # we pay more attention to node feats, thus could share edge feats in multi-heads to reduce dimension
@@ -30,8 +31,8 @@ class LGNNConcatRAT(nn.Module):
 
     def forward(self, x, batch):
         if self.relation_share_layers:
-            lg_x_full = self.relation_embed(batch.graph.full_edge_feat)
             lg_x = self.relation_embed(batch.graph.edge_feat)
+            lg_x_full = self.relation_embed(batch.graph.full_edge_feat)
         else:
             lg_x = self.relation_embed[0](batch.graph.edge_feat)
         src_ids, dst_ids = batch.graph.g.edges(order='eid')
@@ -76,19 +77,6 @@ class LGNNConcatRATLayer(nn.Module):
         return out_x, out_lg_x
 
 class NodeUpdateLayer(RATLayer):
-
-    def __init__(self, ndim, edim, num_heads=8, feat_drop=0.2):
-        super(NodeUpdateLayer, self).__init__()
-        self.num_heads = num_heads
-        self.ndim, self.edim = ndim, edim
-        self.num_heads = num_heads
-        self.d_k = self.ndim // self.num_heads
-        self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.ndim, self.ndim),\
-            nn.Linear(self.ndim, self.ndim, bias=False), nn.Linear(self.ndim, self.ndim, bias=False)
-        self.affine_o = nn.Linear(self.ndim, self.ndim)
-        self.layernorm = nn.LayerNorm(self.ndim)
-        self.feat_dropout = nn.Dropout(p=feat_drop)
-        self.ffn = FFN(self.ndim)
 
     def forward(self, x, lg_x_full, lg_x, full_g, g):
         """ @Params:

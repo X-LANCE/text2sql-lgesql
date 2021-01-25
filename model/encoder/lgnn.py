@@ -23,7 +23,8 @@ class LGNN(nn.Module):
         # we pay more attention to node feats, thus could share edge feats in multi-heads to reduce dimension
         self.edim = args.gnn_hidden_size // args.num_heads if self.relation_share_heads else args.gnn_hidden_size
         self.relation_embed = nn.Embedding(self.relation_num, self.edim)
-        self.gnn_layers = nn.ModuleList([LGNNLayer(self.ndim, self.edim, args.q, args.k, args.v, num_heads=args.num_heads, feat_drop=args.dropout)
+        # self.gnn_layers = nn.ModuleList([LGNNLayer(self.ndim, self.edim, args.q, args.k, args.v, num_heads=args.num_heads, feat_drop=args.dropout)
+        self.gnn_layers = nn.ModuleList([LGNNLayer(self.ndim, self.edim, num_heads=args.num_heads, feat_drop=args.dropout)
             for _ in range(self.num_layers)])
 
     def forward(self, x, batch):
@@ -40,7 +41,8 @@ class LGNNLayer(nn.Module):
         self.ndim, self.edim = ndim, edim
         self.num_heads = num_heads
         self.node_update = NodeUpdateLayer(self.ndim, self.edim, self.num_heads, feat_drop)
-        self.edge_update = EdgeUpdateLayerMetaPath(self.edim, self.ndim, q, k, v, self.num_heads, feat_drop=feat_drop)
+        # self.edge_update = EdgeUpdateLayerMetaPath(self.edim, self.ndim, q, k, v, self.num_heads, feat_drop=feat_drop)
+        self.edge_update = EdgeUpdateLayerMetaPath(self.edim, self.ndim, self.num_heads, feat_drop=feat_drop)
 
     def forward(self, x, lg_x, g, lg, src_ids, dst_ids):
         """ Different strategies to update nodes and edges:
@@ -108,7 +110,7 @@ class EdgeUpdateLayerNodeAttention(nn.Module):
 
 class EdgeUpdateLayerMetaPath(nn.Module):
 
-    def __init__(self, edim, ndim, q, k, v, num_heads=8, use_node_feat=True, use_ffn=True, feat_drop=0.2):
+    def __init__(self, edim, ndim, num_heads=8, use_node_feat=True, use_ffn=True, feat_drop=0.2):
         super(EdgeUpdateLayerMetaPath, self).__init__()
         self.edim, self.ndim = edim, ndim
         self.num_heads = num_heads
@@ -116,7 +118,7 @@ class EdgeUpdateLayerMetaPath(nn.Module):
         self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.edim, self.ndim), \
             nn.Linear(self.edim, self.ndim, bias=False), nn.Linear(self.edim, self.ndim, bias=False)
         self.use_node_feat = use_node_feat
-        self.q, self.k, self.v = q, k, v
+        # self.q, self.k, self.v = q, k, v
         # if self.use_node_feat:
             # self.affine_n = nn.Linear(self.ndim, self.ndim)
         self.affine_o = nn.Linear(self.ndim, self.edim)
@@ -130,9 +132,10 @@ class EdgeUpdateLayerMetaPath(nn.Module):
         # we do not use node feats src_x and dst_x
         q, k, v = self.affine_q(self.feat_dropout(x)), self.affine_k(self.feat_dropout(x)), self.affine_v(self.feat_dropout(x))
         # e = self.affine_n(self.feat_dropout(src_x)) if self.use_node_feat else 0
-        eq = src_x if self.q == 'src' else dst_x if self.q == 'dst' else 0
-        ek = src_x if self.k == 'src' else 0
-        ev = src_x if self.v == 'src' else dst_x if self.v == 'dst' else 0
+        # eq = src_x if self.q == 'src' else dst_x if self.q == 'dst' else 0
+        # ek = src_x if self.k == 'src' else 0
+        # ev = src_x if self.v == 'src' else dst_x if self.v == 'dst' else 0
+        eq, ek, ev = src_x, 0, src_x
         with g.local_scope():
             g.ndata['q'] = (q + eq).view(-1, self.num_heads, self.d_k)
             g.ndata['k'] = (k + ek).view(-1, self.num_heads, self.d_k)

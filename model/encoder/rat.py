@@ -39,8 +39,6 @@ class RATLayer(nn.Module):
         self.d_k = self.ndim // self.num_heads
         self.affine_q, self.affine_k, self.affine_v = nn.Linear(self.ndim, self.ndim),\
             nn.Linear(self.ndim, self.ndim, bias=False), nn.Linear(self.ndim, self.ndim, bias=False)
-        # self.affine_ke = nn.Linear(self.edim, self.ndim)
-        # self.affine_ve = nn.Linear(self.edim, self.ndim)
         self.affine_o = nn.Linear(self.ndim, self.ndim)
         self.layernorm = nn.LayerNorm(self.ndim)
         self.feat_dropout = nn.Dropout(p=feat_drop)
@@ -54,9 +52,6 @@ class RATLayer(nn.Module):
         """
         # pre-mapping q/k/v affine
         q, k, v = self.affine_q(self.feat_dropout(x)), self.affine_k(self.feat_dropout(x)), self.affine_v(self.feat_dropout(x))
-        # e = self.affine_e(self.feat_dropout(lg_x))
-        # e_k = self.affine_ke(self.feat_dropout(lg_x))
-        # e_v = self.affine_ve(self.feat_dropout(lg_x))
         e = lg_x.view(-1, self.num_heads, self.d_k) if lg_x.size(-1) == q.size(-1) else \
             lg_x.unsqueeze(1).expand(-1, self.num_heads, -1)
         with g.local_scope():

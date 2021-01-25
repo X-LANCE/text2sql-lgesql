@@ -75,7 +75,9 @@ class GraphOutputLayerWithPruning(nn.Module):
     def __init__(self, args):
         super(GraphOutputLayerWithPruning, self).__init__()
         self.hidden_size = args.gnn_hidden_size
-        self.graph_pruning = GraphPruning(self.hidden_size, args.num_heads, args.dropout, args.score_function, args.edge_prune, args.relation_share_heads)
+        edim = self.hidden_size // args.num_heads if args.relation_share_heads else \
+            self.hidden_size if args.model != 'lgnn_concat_rat' else self.hidden_size // 2
+        self.graph_pruning = GraphPruning(self.hidden_size, args.num_heads, args.dropout, args.score_function, args.edge_prune, edim)
 
     def forward(self, inputs, lg_inputs, batch):
         outputs = inputs.new_zeros(len(batch), batch.mask.size(1), self.hidden_size)
@@ -94,14 +96,13 @@ class GraphOutputLayerWithPruning(nn.Module):
 
 class GraphPruning(nn.Module):
 
-    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2, score_function='affine', edge_prune=True, relation_share_heads=True):
+    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2, score_function='affine', edge_prune=True, edim=None):
         super(GraphPruning, self).__init__()
         self.hidden_size = hidden_size
         self.node_mha = DGLMHA(hidden_size, hidden_size, num_heads, feat_drop)
         self.node_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
         self.edge_prune = edge_prune
         if self.edge_prune:
-            edim = hidden_size // num_heads if relation_share_heads else hidden_size
             self.edge_mha = DGLMHA(hidden_size, edim, num_heads, feat_drop)
             self.edge_score_function = ScoreFunction(edim, mlp=2, method=score_function)
         self.loss_function = nn.BCEWithLogitsLoss(reduction='sum')
