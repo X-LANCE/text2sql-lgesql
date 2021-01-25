@@ -14,11 +14,11 @@ from utils.evaluator import Evaluator
 class Example():
 
     @classmethod
-    def configuration(cls, ptm=None, method='lgnn', table_path='data/tables.bin', add_cls=False, fast=True):
+    def configuration(cls, ptm=None, method='lgnn', table_path='data/tables.bin', tables=None, add_cls=False, fast=True):
         cls.ptm = ptm
         cls.grammar = ASDLGrammar.from_filepath(GRAMMAR_FILEPATH)
         cls.trans = TransitionSystem.get_class_by_lang('sql')(cls.grammar)
-        cls.tables = pickle.load(open(table_path, 'rb'))
+        cls.tables = pickle.load(open(table_path, 'rb')) if tables is None else tables
         cls.evaluator = Evaluator(cls.trans)
         if ptm is None:
             cls.word2vec = Word2vecUtils()
