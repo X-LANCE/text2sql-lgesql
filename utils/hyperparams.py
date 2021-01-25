@@ -13,7 +13,7 @@ def hyperparam_path_hetgnn(args):
     exp_path = '%s_gp_%s' % (args.model, args.smoothing) if 'with_' in args.output_model else '%s' % (args.model)
     exp_path += '_edge' if args.edge_prune and 'with_' in args.output_model else ''
     exp_path += '_cls' if args.add_cls else ''
-    exp_path += '__q_%s_k_%s_v_%s' % (args.q, args.k, args.v)
+    # exp_path += '__q_%s_k_%s_v_%s' % (args.q, args.k, args.v)
     # encoder params
     exp_path += '__emb_%s' % (args.embed_size) if args.ptm is None else '__ptm_%s' % (args.ptm)
     exp_path += '__gnn_%s_x_%s' % (args.gnn_hidden_size, args.gnn_num_layers)

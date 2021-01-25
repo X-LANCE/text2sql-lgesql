@@ -51,9 +51,9 @@ def add_argument_encoder(arg_parser):
     arg_parser.add_argument('--relation_share_heads', action='store_true')
     arg_parser.add_argument('--score_function', choices=['affine', 'bilinear', 'biaffine', 'dot'], default='affine', help='graph pruning score function')
     arg_parser.add_argument('--smoothing', type=float, default=0.15, help='label smoothing factor for graph pruning')
-    arg_parser.add_argument('--q', choices=['src', 'dst', 'none'], type=str)
-    arg_parser.add_argument('--k', choices=['src', 'none'], type=str)
-    arg_parser.add_argument('--v', choices=['src', 'dst', 'none'], type=str)
+    # arg_parser.add_argument('--q', choices=['src', 'dst', 'none'], type=str)
+    # arg_parser.add_argument('--k', choices=['src', 'none'], type=str)
+    # arg_parser.add_argument('--v', choices=['src', 'dst', 'none'], type=str)
     return arg_parser
 
 def add_argument_decoder(arg_parser):

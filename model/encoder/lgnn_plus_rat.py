@@ -26,11 +26,11 @@ class LGNNPlusRAT(nn.Module):
 
     def forward(self, x, batch):
         lg_x = self.relation_embed(batch.graph.edge_feat)
-        src_ids, dst_ids = batch.graph.g.edges(order='eid')
+        lg_x_local = lg_x[batch.graph.local_index]
+        src_ids, dst_ids = batch.graph.src_ids, batch.graph.dst_ids
         for i in range(self.num_layers):
-            x, lg_x = self.gnn_layers[i](x, lg_x, batch.graph.g, batch.graph.lg, src_ids.long(), dst_ids.long(), batch.graph.local_index)
-        lg_x = lg_x[batch.graph.local_index] # return local relations for graph pruning if edge_prune == True
-        return x, lg_x
+            x, lg_x, lg_x_local = self.gnn_layers[i](x, lg_x, lg_x_local, batch.graph.g, batch.graph.lg, src_ids, dst_ids, batch.graph.local_index)
+        return x, lg_x_local
 
 class LGNNPlusRATLayer(nn.Module):
 
@@ -41,7 +41,7 @@ class LGNNPlusRATLayer(nn.Module):
         self.node_update = NodeUpdateLayer(self.ndim, self.edim, self.num_heads, feat_drop)
         self.edge_update = EdgeUpdateLayerMetaPath(self.edim, self.ndim, self.num_heads, feat_drop=feat_drop)
 
-    def forward(self, x, lg_x, g, lg, src_ids, dst_ids, local_index):
+    def forward(self, x, lg_x, lg_x_local, g, lg, src_ids, dst_ids, local_index):
         """ Different strategies to update nodes and edges:
         1. parallel scheme
         2. first update node, then use new node feats to update edge
@@ -51,7 +51,6 @@ class LGNNPlusRATLayer(nn.Module):
         out_x, _ = self.node_update(x, lg_x, g)
         src_x = torch.index_select(x, dim=0, index=src_ids)
         dst_x = torch.index_select(x, dim=0, index=dst_ids)
-        lg_x_local = lg_x[local_index]
         out_lg_x_local, _ = self.edge_update(lg_x_local, src_x, dst_x, lg)
         out_lg_x = lg_x.masked_scatter_(local_index.unsqueeze(-1), out_lg_x_local)
 
@@ -59,15 +58,13 @@ class LGNNPlusRATLayer(nn.Module):
         # out_x, _ = self.node_update(x, lg_x, g)
         # src_x = torch.index_select(out_x, dim=0, index=src_ids)
         # dst_x = torch.index_select(out_x, dim=0, index=dst_ids)
-        # lg_x_local = lg_x[local_index]
         # out_lg_x_local, _ = self.edge_update(lg_x_local, src_x, dst_x, lg)
         # out_lg_x = lg_x.masked_scatter_(local_index.unsqueeze(-1), out_lg_x_local)
 
         # edge update first
         # src_x = torch.index_select(x, dim=0, index=src_ids)
         # dst_x = torch.index_select(x, dim=0, index=dst_ids)
-        # lg_x_local = lg_x[local_index]
         # out_lg_x_local, _ = self.edge_update(lg_x_local, src_x, dst_x, lg)
         # out_lg_x = lg_x.masked_scatter_(local_index.unsqueeze(-1), out_lg_x_local)
         # out_x, _ = self.node_update(x, out_lg_x, g)
-        return out_x, out_lg_x
+        return out_x, out_lg_x, out_lg_x_local
