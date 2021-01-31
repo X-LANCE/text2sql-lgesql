@@ -36,13 +36,15 @@ class LGNN(nn.Module):
 
 class LGNNLayer(nn.Module):
 
-    def __init__(self, ndim, edim, q, k, v, num_heads=8, feat_drop=0.2):
+    def __init__(self, ndim, edim, num_heads=8, feat_drop=0.2):
         super(LGNNLayer, self).__init__()
         self.ndim, self.edim = ndim, edim
         self.num_heads = num_heads
         self.node_update = NodeUpdateLayer(self.ndim, self.edim, self.num_heads, feat_drop)
         # self.edge_update = EdgeUpdateLayerMetaPath(self.edim, self.ndim, q, k, v, self.num_heads, feat_drop=feat_drop)
         self.edge_update = EdgeUpdateLayerMetaPath(self.edim, self.ndim, self.num_heads, feat_drop=feat_drop)
+        # self.edge_update = EdgeUpdateLayerNodeAffine(self.edim, self.ndim, self.num_heads, feat_drop=feat_drop)
+        # self.edge_update = EdgeUpdateLayerNodeAttention(self.edim, self.ndim, self.num_heads, feat_drop=feat_drop)
 
     def forward(self, x, lg_x, g, lg, src_ids, dst_ids):
         """ Different strategies to update nodes and edges:
