@@ -77,7 +77,7 @@ class GraphOutputLayerWithPruning(nn.Module):
         self.hidden_size = args.gnn_hidden_size
         edim = self.hidden_size // args.num_heads if args.relation_share_heads else \
             self.hidden_size if args.model != 'lgnn_concat_rat' else self.hidden_size // 2
-        self.graph_pruning = GraphPruning(self.hidden_size, args.num_heads, args.dropout, args.score_function, args.edge_prune, edim)
+        self.graph_pruning = GraphPruning(self.hidden_size, args.num_heads, args.dropout, args.score_function, args.prune_type, edim)
 
     def forward(self, inputs, lg_inputs, batch):
         outputs = inputs.new_zeros(len(batch), batch.mask.size(1), self.hidden_size)
@@ -96,22 +96,25 @@ class GraphOutputLayerWithPruning(nn.Module):
 
 class GraphPruning(nn.Module):
 
-    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2, score_function='affine', edge_prune=True, edim=None):
+    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2, score_function='affine', prune_type='both', edim=None):
         super(GraphPruning, self).__init__()
         self.hidden_size = hidden_size
-        self.node_mha = DGLMHA(hidden_size, hidden_size, num_heads, feat_drop)
-        self.node_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
-        self.edge_prune = edge_prune
-        if self.edge_prune:
+        self.prune_type = prune_type
+        if self.prune_type != 'edge':
+            self.node_mha = DGLMHA(hidden_size, hidden_size, num_heads, feat_drop)
+            self.node_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
+        if self.prune_type != 'node':
             self.edge_mha = DGLMHA(hidden_size, edim, num_heads, feat_drop)
             self.edge_score_function = ScoreFunction(edim, mlp=2, method=score_function)
         self.loss_function = nn.BCEWithLogitsLoss(reduction='sum')
 
     def forward(self, context, node, edge, ng, eg, nl, el):
-        node_context = self.node_mha(context, node, ng)
-        node_score = self.node_score_function(node_context, node)
-        loss = self.loss_function(node_score, nl)
-        if self.edge_prune:
+        loss = torch.tensor(0., dtype=torch.float).to(context.device)
+        if self.prune_type != 'edge':
+            node_context = self.node_mha(context, node, ng)
+            node_score = self.node_score_function(node_context, node)
+            loss += self.loss_function(node_score, nl)
+        if self.prune_type != 'node':
             edge_context = self.edge_mha(context, edge, eg)
             edge_score = self.edge_score_function(edge_context, edge)
             loss += self.loss_function(edge_score, el)

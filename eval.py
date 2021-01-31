@@ -1,9 +1,9 @@
 #coding=utf8
 import sys, os, json, pickle, argparse, time
 from argparse import Namespace
-os.environ['NLTK_DATA'] = os.path.join(os.path.sep, 'root', 'nltk_data')
-os.environ["STANZA_RESOURCES_DIR"] = os.path.join(os.path.sep, 'root', 'stanza_resources')
-os.environ['EMBEDDINGS_ROOT'] = os.path.join(os.path.sep, 'root', '.embeddings')
+# os.environ['NLTK_DATA'] = os.path.join(os.path.sep, 'root', 'nltk_data')
+# os.environ["STANZA_RESOURCES_DIR"] = os.path.join(os.path.sep, 'root', 'stanza_resources')
+# os.environ['EMBEDDINGS_ROOT'] = os.path.join(os.path.sep, 'root', '.embeddings')
 
 import torch
 from preprocess.process_dataset import process_tables, process_dataset
@@ -42,8 +42,8 @@ args = parser.parse_args(sys.argv[1:])
 dataset, tables = preprocess_database_and_dataset(db_dir=args.db_dir, table_path=args.table_path, dataset_path=args.dataset_path)
 params = json.load(open(os.path.join(args.saved_model, 'params.json'), 'r'), object_hook=lambda d: Namespace(**d))
 params.lazy_load = True # load PTM from AutoConfig instead of AutoModel.from_pretrained(...)
-vocab_path = os.path.join(args.saved_model, 'vocab.txt')
-Example.configuration(params.ptm, method=params.method, tables=tables)
+position = params.position if hasattr(params, 'position') else 'qtc'
+Example.configuration(params.ptm, method=params.model, tables=tables, add_cls=params.add_cls, position=position)
 dataset = load_examples(dataset, tables)
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")

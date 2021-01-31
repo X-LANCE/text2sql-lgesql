@@ -14,7 +14,7 @@ from utils.evaluator import Evaluator
 class Example():
 
     @classmethod
-    def configuration(cls, ptm=None, method='lgnn', table_path='data/tables.bin', tables=None, add_cls=False, fast=True):
+    def configuration(cls, ptm=None, method='lgnn', table_path='data/tables.bin', tables=None, add_cls=False, fast=True, position='qtc'):
         cls.ptm = ptm
         cls.grammar = ASDLGrammar.from_filepath(GRAMMAR_FILEPATH)
         cls.trans = TransitionSystem.get_class_by_lang('sql')(cls.grammar)
@@ -30,11 +30,11 @@ class Example():
             cls.word_vocab = cls.tokenizer.get_vocab()
         cls.add_cls = add_cls # whether add special CLS node
         cls.relation_vocab = Vocab(padding=False, unk=False, boundary=False, iterable=RELATIONS, default=None)
-        cls.fast = fast
+        cls.fast, cls.position = fast, position
         cls.graph_factory = GraphFactory(method, cls.add_cls, cls.relation_vocab)
 
     @classmethod
-    def load_dataset(cls, choice, debug=True):
+    def load_dataset(cls, choice, debug=False):
         assert choice in ['train', 'dev']
         fp = os.path.join('data', choice + '.dgl.bin') if cls.fast else \
             os.path.join('data', choice + '.bin')
@@ -117,24 +117,26 @@ class Example():
                 else [0] * (len(self.question_id) + len(self.table_id) + len(self.column_id))
 
             # by default, format: [CLS] q1 q2 ... [SEP] t1 t2 ... [SEP] c1 c2 ... [SEP]
-            self.position_id = list(range(len(self.input_id)))
-            # another choice: [CLS] q1 q2 ... [SEP] * [SEP] t1 c1 c2 ... t2 c3 c4 ... [SEP]
-            # question_position_id = list(range(len(self.question_id)))
-            # start = len(question_position_id)
-            # column_position_id = [start + i for i in range(column_word_len[0])] # special symbol *
-            # start += column_word_len[0]
-            # column_position_id.insert(0, start) # add intermediate [SEP]
-            # start += 1
-            # table_position_id = []
-            # for idx, col_idxs in enumerate(db['table2columns']):
-                # table_position_id.extend([start + i for i in range(table_word_len[idx])])
-                # start += table_word_len[idx]
-                # for col_id in col_idxs:
-                    # column_position_id.extend([start + i for i in range(column_word_len[col_id])])
-                    # start += column_word_len[col_id]
-            # column_position_id.append(start) # last [SEP]
-            # self.position_id = question_position_id + table_position_id + column_position_id
-            # assert len(self.position_id) == len(self.input_id)
+            if Example.position == 'qtc':
+                self.position_id = list(range(len(self.input_id)))
+            else:
+                # another choice: [CLS] q1 q2 ... [SEP] * [SEP] t1 c1 c2 ... t2 c3 c4 ... [SEP]
+                question_position_id = list(range(len(self.question_id)))
+                start = len(question_position_id)
+                column_position_id = [start + i for i in range(column_word_len[0])] # special symbol *
+                start += column_word_len[0]
+                column_position_id.insert(0, start) # add intermediate [SEP]
+                start += 1
+                table_position_id = []
+                for idx, col_idxs in enumerate(db['table2columns']):
+                    table_position_id.extend([start + i for i in range(table_word_len[idx])])
+                    start += table_word_len[idx]
+                    for col_id in col_idxs:
+                        column_position_id.extend([start + i for i in range(column_word_len[col_id])])
+                        start += column_word_len[col_id]
+                column_position_id.append(start) # last [SEP]
+                self.position_id = question_position_id + table_position_id + column_position_id
+                assert len(self.position_id) == len(self.input_id)
 
             self.question_mask_ptm = self.question_mask_ptm + [0] * (len(self.table_id) + len(self.column_id))
             self.table_mask_ptm = [0] * len(self.question_id) + self.table_mask_ptm + [0] * len(self.column_id)

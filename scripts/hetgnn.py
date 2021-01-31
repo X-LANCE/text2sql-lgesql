@@ -28,9 +28,9 @@ logger.info("Use GPU with index %s" % (args.device) if args.device >= 0 else "Us
 start_time = time.time()
 if args.read_model_path:
     params = json.load(open(os.path.join(args.read_model_path, 'params.json')), object_hook=lambda d: Namespace(**d))
-    args.ptm, args.model, args.add_cls, args.lazy_load = params.ptm, params.model, params.add_cls, True
+    args.ptm, args.model, args.add_cls, args.position, args.lazy_load = params.ptm, params.model, params.add_cls, params.position, True
 # set up the grammar, transition system, evaluator, etc.
-Example.configuration(ptm=args.ptm, method=args.model, add_cls=args.add_cls)
+Example.configuration(ptm=args.ptm, method=args.model, add_cls=args.add_cls, position=args.position)
 train_dataset, dev_dataset = Example.load_dataset('train'), Example.load_dataset('dev')
 logger.info("Load dataset and database finished, cost %.4fs ..." % (time.time() - start_time))
 logger.info("Dataset size: train -> %d ; dev -> %d" % (len(train_dataset), len(dev_dataset)))
@@ -89,7 +89,7 @@ if not args.testing:
             epoch_loss += loss.item()
             epoch_gp_loss += gp_loss.item()
             # print("Minibatch loss: %.4f" % (loss.item()))
-            loss = loss + gp_loss
+            loss += gp_loss
             loss.backward()
             if count == args.grad_accumulate or j + step_size >= nsamples:
                 count = 0

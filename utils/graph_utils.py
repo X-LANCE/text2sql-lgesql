@@ -14,7 +14,8 @@ class GraphFactory():
 
     def __init__(self, method='lgnn', add_cls=True, relation_vocab=None):
         super(GraphFactory, self).__init__()
-        # self.method = eval('self.' + method)
+        if method in ['rat', 'lgnn']:
+            self.method = eval('self.' + method)
         self.fast_method = eval('self.fast_' + method)
         self.batch_method = eval('self.batch_' + method)
         self.add_cls, self.relation_vocab = add_cls, relation_vocab
@@ -147,6 +148,16 @@ class GraphFactory():
                 return 1.0
             else: return 0.0
         graph.edge_label = torch.tensor(list(map(check_edge, filter(lambda e: e[0] >= q_num and e[1] >= q_num, edges))), dtype=torch.float)
+        return graph
+
+    def fast_rat(self, ex, db):
+        graph = GraphExample()
+        edges = ex['graph'].full_edges
+        # edges = ex['graph'].edges
+        rel_ids = list(map(lambda r: self.relation_vocab[r[2]], edges))
+        graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
+        graph.g = ex['graph'].full_g
+        # graph.g = ex['graph'].g
         return graph
 
     def rat(self, ex, db, relation):
