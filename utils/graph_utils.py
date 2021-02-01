@@ -158,6 +158,12 @@ class GraphFactory():
         graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
         graph.g = ex['graph'].full_g
         # graph.g = ex['graph'].g
+        graph.gp_ng = ex['graph'].gp_ng
+        graph.context_index = torch.tensor(ex['graph'].context_index, dtype=torch.bool)
+        graph.node_index = torch.tensor(ex['graph'].node_index, dtype=torch.bool)
+        # graph.edge_index = torch.tensor(ex['graph'].edge_index, dtype=torch.bool)
+        graph.node_label = torch.tensor(ex['graph'].node_label, dtype=torch.float)
+        # graph.edge_label = torch.tensor(ex['graph'].edge_label, dtype=torch.float)
         return graph
 
     def rat(self, ex, db, relation):
@@ -230,4 +236,16 @@ class GraphFactory():
         bg = BatchedGraph()
         bg.g = dgl.batch([ex.g for ex in graph_list]).to(device)
         bg.edge_feat = torch.cat([ex.edge_feat for ex in graph_list], dim=0).to(device)
+        bg.context_index = torch.cat([ex.context_index for ex in graph_list], dim=0).to(device)
+        bg.node_index = torch.cat([ex.node_index for ex in graph_list], dim=0).to(device)
+        smoothing = kwargs.pop('smoothing', 0.0)
+        node_label = torch.cat([ex.node_label for ex in graph_list], dim=0)
+        node_label = node_label.masked_fill_(~ node_label.bool(), 2 * smoothing) - smoothing
+        bg.node_label = node_label.to(device)
+        # bg.edge_index = torch.cat([ex.edge_index for ex in graph_list], dim=0).to(device)
+        # edge_label = torch.cat([ex.edge_label for ex in graph_list], dim=0)
+        # edge_label = edge_label.masked_fill_(~ edge_label.bool(), 2 * smoothing) - smoothing
+        # bg.edge_label = edge_label.to(device)
+        bg.gp_ng = dgl.batch([ex.gp_ng for ex in graph_list]).to(device)
+        # bg.gp_eg = dgl.batch([ex.gp_eg for ex in graph_list]).to(device)
         return bg
