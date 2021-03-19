@@ -38,6 +38,7 @@ class LGNNConcatRAT(nn.Module):
         src_ids, dst_ids = batch.graph.g.edges(order='eid')
         for i in range(self.num_layers):
             # lg_x_full is directly extracted in each layer
+            # lg_x = self.relation_embed[i](batch.graph.edge_feat) if not self.relation_share_layers else lg_x
             lg_x_full = self.relation_embed[i](batch.graph.full_edge_feat) if not self.relation_share_layers else lg_x_full
             x, lg_x = self.gnn_layers[i](x, lg_x_full, lg_x, batch.graph.full_g, batch.graph.g, batch.graph.lg, src_ids.long(), dst_ids.long())
         return x, lg_x
@@ -59,6 +60,7 @@ class LGNNConcatRATLayer(nn.Module):
         """
         # parallel
         out_x, _ = self.node_update(x, lg_x_full, lg_x, full_g, g)
+        # return out_x, lg_x
         src_x = torch.index_select(x, dim=0, index=src_ids)
         dst_x = torch.index_select(x, dim=0, index=dst_ids)
         out_lg_x, _ = self.edge_update(lg_x, src_x, dst_x, lg)

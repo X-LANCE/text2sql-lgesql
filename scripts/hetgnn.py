@@ -28,9 +28,11 @@ logger.info("Use GPU with index %s" % (args.device) if args.device >= 0 else "Us
 start_time = time.time()
 if args.read_model_path:
     params = json.load(open(os.path.join(args.read_model_path, 'params.json')), object_hook=lambda d: Namespace(**d))
-    args.ptm, args.model, args.add_cls, args.position, args.lazy_load = params.ptm, params.model, params.add_cls, params.position, True
+    params.lazy_load = True
+else:
+    params = args
 # set up the grammar, transition system, evaluator, etc.
-Example.configuration(ptm=args.ptm, method=args.model, add_cls=args.add_cls, position=args.position)
+Example.configuration(ptm=params.ptm, method=params.model, add_cls=params.add_cls, position='qtc')#params.position)
 train_dataset, dev_dataset = Example.load_dataset('train'), Example.load_dataset('dev')
 logger.info("Load dataset and database finished, cost %.4fs ..." % (time.time() - start_time))
 logger.info("Dataset size: train -> %d ; dev -> %d" % (len(train_dataset), len(dev_dataset)))
@@ -61,7 +63,8 @@ def decode(choice, output_path, acc_type='sql'):
             current_batch = Batch.from_example_list(dataset[i: i + args.batch_size], device, train=False, method='hetgnn')
             hyps = model.parse(current_batch, args.beam_size)
             all_hyps.extend(hyps)
-        acc = evaluator.acc(all_hyps, dataset, output_path, acc_type=acc_type, etype='match')
+        # acc = evaluator.acc(all_hyps, dataset, output_path, acc_type=acc_type, etype='match')
+        acc = evaluator.error_analysis(all_hyps, dataset, output_path, etype='match')
     torch.cuda.empty_cache()
     gc.collect()
     return acc
@@ -124,10 +127,11 @@ if not args.testing:
     # dev_acc_beam = decode('dev', output_path=os.path.join(exp_path, 'dev.iter' + str(best_result['iter']) + '.beam' + str(args.beam_size)), acc_type='beam')
     # logger.info('FINAL BEST RESULT: \tEpoch: %d\tDev acc/Beam acc: %.4f/%.4f' % (best_result['iter'], best_result['dev_acc'], dev_acc_beam))
 else:
-    start_time = time.time()
-    train_acc = decode('train', output_path=os.path.join(args.read_model_path, 'train.eval'), acc_type='sql')
-    logger.info("Evaluation costs %.2fs ; Train dataset exact match acc is %.4f ." % (time.time() - start_time, train_acc))
+    # start_time = time.time()
+    # train_acc = decode('train', output_path=os.path.join(args.read_model_path, 'train.eval'), acc_type='sql')
+    # logger.info("Evaluation costs %.2fs ; Train dataset exact match acc is %.4f ." % (time.time() - start_time, train_acc))
     start_time = time.time()
     dev_acc = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval'), acc_type='sql')
-    dev_acc_beam = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval.beam' + str(args.beam_size)), acc_type='beam')
-    logger.info("Evaluation costs %.2fs ; Dev dataset exact match/inner beam acc is %.4f/%.4f ." % (time.time() - start_time, dev_acc, dev_acc_beam))
+    logger.info("Evaluation costs %.2fs ; Dev dataset exact match acc is %.4f ." % (time.time() - start_time, dev_acc))
+    # dev_acc_beam = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval.beam' + str(args.beam_size)), acc_type='beam')
+    # logger.info("Evaluation costs %.2fs ; Dev dataset exact match/inner beam acc is %.4f/%.4f ." % (time.time() - start_time, dev_acc, dev_acc_beam))

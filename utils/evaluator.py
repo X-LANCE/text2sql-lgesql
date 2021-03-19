@@ -20,6 +20,27 @@ class Evaluator():
             "beam": self.beam_acc, # if the correct answer exist in the beam, assume the result is true
         }
 
+    def error_analysis(self, pred_hyps, dataset, output_path=None, etype='match'):
+        pred_asts = [hyp[0].tree for hyp in pred_hyps]
+        scores = {}
+        for each in ['easy', 'medium', 'hard', 'extra', 'all']:
+            scores[each] = [0, 0.]
+        with open(output_path, 'w') as of:
+            for idx, pred in enumerate(pred_asts):
+                question, gold_sql, db = dataset[idx].ex['question'], dataset[idx].query, dataset[idx].db
+                pred_sql = self.transition_system.ast_to_surface_code(pred, db)
+                score, hardness = self.single_acc(pred_sql, gold_sql, db['db_id'], etype)
+                of.write(question + '\n' + gold_sql + '\n' + pred_sql + '\n' + hardness + ':' + str(score) + '\n\n')
+                scores[hardness][0] += 1
+                scores['all'][0] += 1
+                if int(score) == 1:
+                    scores[hardness][1] += 1.0
+                    scores['all'][1] += 1.0
+            for each in scores:
+                accuracy = scores[each][1] / float(scores[each][0]) if scores[each][0] != 0 else 0.
+                scores[each].append(accuracy)
+        return scores['all'][2]
+
     def acc(self, pred_hyps, dataset, output_path=None, acc_type='sql', etype='match'):
         assert len(pred_hyps) == len(dataset) and acc_type in self.acc_dict and etype in ['match', 'exec']
         acc_method = self.acc_dict[acc_type]
