@@ -1,0 +1,455 @@
+What is the name and capacity for the stadium with highest average attendance?
+SELECT name ,  capacity FROM stadium ORDER BY average DESC LIMIT 1
+SELECT stadium.Name , stadium.Capacity FROM stadium ORDER BY stadium.Average DESC LIMIT 1
+SELECT stadium.Name , stadium.Capacity FROM stadium GROUP BY stadium.Highest ORDER BY AVG(stadium.Average) DESC LIMIT 1
+medium:1.0
+medium:0.0
+
+What is the name and capacity for the stadium with the highest average attendance?
+SELECT name ,  capacity FROM stadium ORDER BY average DESC LIMIT 1
+SELECT stadium.Name , stadium.Capacity FROM stadium ORDER BY stadium.Average DESC LIMIT 1
+SELECT stadium.Name , stadium.Capacity FROM stadium GROUP BY stadium.Highest ORDER BY AVG(stadium.Average) DESC LIMIT 1
+medium:1.0
+medium:0.0
+
+For each stadium, how many concerts play there?
+SELECT T2.name ,  count(*) FROM concert AS T1 JOIN stadium AS T2 ON T1.stadium_id  =  T2.stadium_id GROUP BY T1.stadium_id
+SELECT stadium.Name , COUNT(*) FROM stadium JOIN concert GROUP BY concert.Stadium_ID
+SELECT concert.Stadium_ID , COUNT(*) FROM concert GROUP BY concert.Stadium_ID
+medium:1.0
+medium:0.0
+
+What are the names of the singers and number of concerts for each person?
+SELECT T2.name ,  count(*) FROM singer_in_concert AS T1 JOIN singer AS T2 ON T1.singer_id  =  T2.singer_id GROUP BY T2.singer_id
+SELECT singer.Name , COUNT(*) FROM singer_in_concert JOIN singer GROUP BY singer_in_concert.Singer_ID
+SELECT singer.Name , COUNT(*) FROM concert JOIN singer_in_concert GROUP BY singer_in_concert.Singer_ID
+medium:1.0
+medium:0.0
+
+Find the maximum weight for each type of pet. List the maximum weight and pet type.
+SELECT max(weight) ,  petType FROM pets GROUP BY petType
+SELECT MAX(Pets.weight) , Pets.PetType FROM Pets GROUP BY Pets.PetType
+SELECT MAX(Pets.weight) , AVG(Pets.weight) , Pets.PetType FROM Pets GROUP BY Pets.PetType
+medium:1.0
+medium:0.0
+
+List the maximum weight and type for each type of pet.
+SELECT max(weight) ,  petType FROM pets GROUP BY petType
+SELECT MAX(Pets.weight) , Pets.PetType FROM Pets GROUP BY Pets.PetType
+SELECT Pets.weight , MAX(Pets.weight) , Pets.PetType FROM Pets GROUP BY Pets.PetType
+medium:1.0
+medium:0.0
+
+Find the first name and age of students who have a pet.
+SELECT DISTINCT T1.fname ,  T1.age FROM student AS T1 JOIN has_pet AS T2 ON T1.stuid  =  T2.stuid
+SELECT Student.Fname , Student.Age FROM Student JOIN Has_Pet
+SELECT Student.Fname , Student.Age FROM Student WHERE Student.StuID IN ( SELECT Has_Pet.StuID FROM Has_Pet )
+medium:1.0
+medium:0.0
+
+For each continent, list its id, name, and how many countries it has?
+SELECT T1.ContId ,  T1.Continent ,  count(*) FROM CONTINENTS AS T1 JOIN COUNTRIES AS T2 ON T1.ContId  =  T2.Continent GROUP BY T1.ContId;
+SELECT continents.ContId , continents.Continent , COUNT(*) FROM continents JOIN countries GROUP BY continents.ContId
+SELECT continents.Continent , COUNT(*) , continents.Continent FROM countries JOIN continents GROUP BY continents.Continent
+medium:1.0
+medium:0.0
+
+What is the number of car models that are produced by each maker and what is the id and full name of each maker?
+SELECT Count(*) ,  T2.FullName ,  T2.id FROM MODEL_LIST AS T1 JOIN CAR_MAKERS AS T2 ON T1.Maker  =  T2.Id GROUP BY T2.id;
+SELECT COUNT(*) , car_makers.Id , car_makers.FullName FROM car_makers JOIN model_list GROUP BY model_list.Maker
+SELECT COUNT(*) , car_makers.Id , car_makers.FullName FROM car_makers JOIN model_list GROUP BY car_makers.Maker
+medium:1.0
+medium:0.0
+
+What is the average edispl for all volvos?
+SELECT avg(T2.edispl) FROM CAR_NAMES AS T1 JOIN CARS_DATA AS T2 ON T1.MakeId  =  T2.Id WHERE T1.Model  =  'volvo';
+SELECT AVG(cars_data.Edispl) FROM cars_data JOIN car_names WHERE car_names.Model = "value"
+SELECT AVG(cars_data.Edispl) FROM cars_data JOIN car_names WHERE car_names.Make = "value"
+medium:1.0
+medium:0.0
+
+In which years cars were produced weighing no less than 3000 and no more than 4000 ?
+select distinct year from cars_data where weight between 3000 and 4000;
+SELECT cars_data.Year FROM cars_data WHERE cars_data.Weight BETWEEN "value" AND "value"
+SELECT cars_data.Year FROM cars_data WHERE cars_data.Weight < "value" GROUP BY cars_data.Year HAVING COUNT(*) > "value"
+easy:1.0
+easy:0.0
+
+How many 'United Airlines' flights go to Airport 'ASY'?
+SELECT count(*) FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T2.Airline  =  T1.uid WHERE T1.Airline  =  "United Airlines" AND T2.DestAirport  =  "ASY"
+SELECT COUNT(*) FROM airlines JOIN flights WHERE airlines.Airline = "value" AND flights.DestAirport = "value"
+SELECT COUNT(*) FROM airlines JOIN flights JOIN airports WHERE airlines.Airline = "value" AND airlines.Airline = "value"
+medium:1.0
+medium:0.0
+
+How many 'United Airlines' flights depart from Airport 'AHD'?
+SELECT count(*) FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T2.Airline  =  T1.uid WHERE T1.Airline  =  "United Airlines" AND T2.SourceAirport  =  "AHD"
+SELECT COUNT(*) FROM airlines JOIN flights WHERE airlines.Airline = "value" AND flights.SourceAirport = "value"
+SELECT COUNT(*) FROM airlines JOIN flights JOIN airports WHERE airports.AirportName = "value" AND airlines.Airline = "value"
+medium:1.0
+medium:0.0
+
+Return the number of United Airlines flights leaving from AHD Airport.
+SELECT count(*) FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T2.Airline  =  T1.uid WHERE T1.Airline  =  "United Airlines" AND T2.SourceAirport  =  "AHD"
+SELECT COUNT(*) FROM airlines JOIN flights WHERE airlines.Airline = "value" AND flights.SourceAirport = "value"
+SELECT COUNT(*) FROM airlines JOIN flights JOIN airports WHERE airports.AirportName = "value" AND airlines.Airline = "value"
+medium:1.0
+medium:0.0
+
+Find the abbreviation and country of the airline that has fewest number of flights?
+SELECT T1.Abbreviation ,  T1.Country FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T1.uid  =  T2.Airline GROUP BY T1.Airline ORDER BY count(*) LIMIT 1
+SELECT airlines.Abbreviation , airlines.Country FROM airlines JOIN flights GROUP BY airlines.Airline ORDER BY COUNT(*) ASC LIMIT 1
+SELECT airlines.Abbreviation , airlines.Country FROM airlines JOIN flights GROUP BY flights.Airline ORDER BY COUNT(*) ASC LIMIT 1
+extra:1.0
+extra:0.0
+
+What are airlines that have flights arriving at airport 'AHD'?
+SELECT T1.Airline FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T1.uid  =  T2.Airline WHERE T2.DestAirport  =  "AHD"
+SELECT airlines.Airline FROM airlines JOIN flights WHERE flights.DestAirport = "value"
+SELECT airlines.Airline FROM airlines JOIN airports JOIN flights WHERE airports.AirportName = "value"
+medium:1.0
+medium:0.0
+
+Find all airlines that have fewer than 200 flights.
+SELECT T1.Airline FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T1.uid  =  T2.Airline GROUP BY T1.Airline HAVING count(*)  <  200
+SELECT airlines.Airline FROM flights JOIN airlines GROUP BY airlines.Airline HAVING COUNT(*) < "value"
+SELECT airlines.Airline FROM flights JOIN airlines GROUP BY flights.Airline HAVING flights.FlightNo < "value"
+medium:1.0
+medium:0.0
+
+Which airlines have less than 200 flights?
+SELECT T1.Airline FROM AIRLINES AS T1 JOIN FLIGHTS AS T2 ON T1.uid  =  T2.Airline GROUP BY T1.Airline HAVING count(*)  <  200
+SELECT airlines.Airline FROM flights JOIN airlines GROUP BY airlines.Airline HAVING COUNT(*) < "value"
+SELECT airlines.Airline FROM flights JOIN airlines GROUP BY flights.Airline HAVING COUNT(flights.FlightNo) < "value"
+medium:1.0
+medium:0.0
+
+What are flight numbers of flights arriving at Airport "APG"?
+SELECT FlightNo FROM FLIGHTS WHERE DestAirport  =  "APG"
+SELECT flights.FlightNo FROM flights WHERE flights.DestAirport = "value"
+SELECT flights.FlightNo FROM flights WHERE airports.AirportName = "value"
+easy:1.0
+easy:0.0
+
+Find the manager name and district of the shop whose number of products is the largest.
+SELECT manager_name ,  district FROM shop ORDER BY number_products DESC LIMIT 1
+SELECT shop.Manager_name , shop.District FROM shop ORDER BY shop.Number_products DESC LIMIT 1
+SELECT shop.Manager_name , shop.District FROM shop GROUP BY shop.Number_products ORDER BY COUNT(*) DESC LIMIT 1
+medium:1.0
+medium:0.0
+
+What are the manager name and district of the shop that sells the largest number of products?
+SELECT manager_name ,  district FROM shop ORDER BY number_products DESC LIMIT 1
+SELECT shop.Manager_name , shop.District FROM shop ORDER BY shop.Number_products DESC LIMIT 1
+SELECT shop.Manager_name , shop.District FROM shop GROUP BY shop.Number_products ORDER BY COUNT(*) DESC LIMIT 1
+medium:1.0
+medium:0.0
+
+Return the name, location and district of all shops in descending order of number of products.
+SELECT name ,  LOCATION ,  district FROM shop ORDER BY number_products DESC
+SELECT shop.Name , shop.Location , shop.District FROM shop ORDER BY shop.Number_products DESC
+SELECT shop.Name , shop.Location , shop.District FROM shop GROUP BY shop.Number_products ORDER BY COUNT(*) DESC
+medium:1.0
+medium:0.0
+
+Find the number of employees hired in each shop; show the shop name as well.
+SELECT count(*) ,  t2.name FROM hiring AS t1 JOIN shop AS t2 ON t1.shop_id  =  t2.shop_id GROUP BY t2.name
+SELECT shop.Name , COUNT(*) FROM hiring JOIN shop GROUP BY shop.Name
+SELECT shop.Name , COUNT(*) FROM hiring JOIN shop GROUP BY hiring.Shop_ID
+medium:1.0
+medium:0.0
+
+What the smallest version number and its template type code?
+SELECT min(Version_Number) ,  template_type_code FROM Templates
+SELECT MIN(Templates.Version_Number) , Templates.Template_Type_Code FROM Templates
+SELECT Templates.Version_Number , Templates.Template_Type_Code FROM Templates ORDER BY Templates.Version_Number ASC LIMIT 1
+medium:1.0
+medium:0.0
+
+Show paragraph details for paragraph with text 'Korea ' .
+select other_details from paragraphs where paragraph_text like 'korea'
+SELECT Paragraphs.Other_Details FROM Paragraphs WHERE Paragraphs.Paragraph_Text LIKE "value"
+SELECT Paragraphs.Other_Details FROM Paragraphs WHERE Paragraphs.Paragraph_Text = "value"
+medium:1.0
+medium:0.0
+
+What is the document id with 1 to 2 paragraphs?
+SELECT document_id FROM Paragraphs GROUP BY document_id HAVING count(*) BETWEEN 1 AND 2
+SELECT Paragraphs.Document_ID FROM Paragraphs GROUP BY Paragraphs.Document_ID HAVING COUNT(*) BETWEEN "value" AND "value"
+SELECT Paragraphs.Document_ID FROM Paragraphs WHERE Paragraphs.Document_ID BETWEEN "value" AND "value"
+easy:1.0
+easy:0.0
+
+Show names of teachers and the number of courses they teach.
+SELECT T2.Name ,  COUNT(*) FROM course_arrange AS T1 JOIN teacher AS T2 ON T1.Teacher_ID  =  T2.Teacher_ID GROUP BY T2.Name
+SELECT teacher.Name , COUNT(*) FROM teacher JOIN course_arrange GROUP BY teacher.Name
+SELECT teacher.Name , COUNT(*) FROM course JOIN course_arrange JOIN teacher GROUP BY teacher.Name
+medium:1.0
+medium:0.0
+
+Find the id and name of the museum that has the most staff members?
+SELECT museum_id ,  name FROM museum ORDER BY num_of_staff DESC LIMIT 1
+SELECT museum.Museum_ID , museum.Name FROM museum ORDER BY museum.Num_of_Staff DESC LIMIT 1
+SELECT museum.Museum_ID , museum.Name FROM museum GROUP BY museum.Num_of_Staff ORDER BY COUNT(*) DESC LIMIT 1
+medium:1.0
+medium:0.0
+
+Find the average rank of winners in all matches.
+SELECT avg(winner_rank) FROM matches
+SELECT AVG(matches.winner_rank) FROM matches
+SELECT AVG(rankings.ranking) FROM rankings
+easy:1.0
+easy:0.0
+
+What are the first names of all players, and their average rankings?
+SELECT avg(ranking) ,  T1.first_name FROM players AS T1 JOIN rankings AS T2 ON T1.player_id  =  T2.player_id GROUP BY T1.first_name
+SELECT players.first_name , AVG(rankings.ranking) FROM players JOIN rankings GROUP BY players.first_name
+SELECT players.first_name , AVG(rankings.ranking) FROM rankings JOIN players GROUP BY rankings.player_id
+medium:1.0
+medium:0.0
+
+How is the math course described?
+SELECT course_description FROM Courses WHERE course_name  =  'math'
+SELECT Courses.course_description FROM Courses WHERE Courses.course_name = "value"
+SELECT Courses.course_name FROM Courses WHERE Courses.course_name = "value"
+easy:1.0
+easy:0.0
+
+For each semester, what is the name and id of the one with the most students registered?
+SELECT T1.semester_name ,  T1.semester_id FROM Semesters AS T1 JOIN Student_Enrolment AS T2 ON T1.semester_id  =  T2.semester_id GROUP BY T1.semester_id ORDER BY count(*) DESC LIMIT 1
+SELECT Semesters.semester_name , Student_Enrolment.semester_id FROM Semesters JOIN Student_Enrolment GROUP BY Student_Enrolment.semester_id ORDER BY COUNT(*) DESC LIMIT 1
+SELECT Semesters.semester_name , Student_Enrolment.semester_id , COUNT(*) FROM Student_Enrolment JOIN Semesters GROUP BY Student_Enrolment.semester_id ORDER BY COUNT(*) DESC LIMIT 1
+extra:1.0
+extra:0.0
+
+What's the name of the course with most number of enrollments?
+SELECT  T1.course_name FROM Courses AS T1 JOIN Student_Enrolment_Courses AS T2 ON T1.course_id  =  T2.course_id GROUP BY T1.course_name ORDER BY count(*) DESC LIMIT 1
+SELECT Courses.course_name FROM Courses JOIN Student_Enrolment_Courses GROUP BY Courses.course_name ORDER BY COUNT(*) DESC LIMIT 1
+SELECT Courses.course_name FROM Courses JOIN Student_Enrolment_Courses GROUP BY Courses.course_id ORDER BY COUNT(*) DESC LIMIT 1
+extra:1.0
+extra:0.0
+
+What is the name of the course with the most students enrolled?
+SELECT  T1.course_name FROM Courses AS T1 JOIN Student_Enrolment_Courses AS T2 ON T1.course_id  =  T2.course_id GROUP BY T1.course_name ORDER BY count(*) DESC LIMIT 1
+SELECT Courses.course_name FROM Courses JOIN Student_Enrolment_Courses GROUP BY Courses.course_name ORDER BY COUNT(*) DESC LIMIT 1
+SELECT Courses.course_name FROM Courses JOIN Student_Enrolment_Courses GROUP BY Courses.course_id ORDER BY COUNT(*) DESC LIMIT 1
+extra:1.0
+extra:0.0
+
+What other details can you tell me about students in reverse alphabetical order?
+SELECT other_student_details FROM Students ORDER BY other_student_details DESC
+SELECT Students.other_student_details FROM Students ORDER BY Students.other_student_details DESC
+SELECT Student_Enrolment.other_details FROM Students ORDER BY Student_Enrolment.other_details DESC
+easy:1.0
+easy:0.0
+
+Describe the section h.
+SELECT section_description FROM Sections WHERE section_name  =  'h'
+SELECT Sections.section_description FROM Sections WHERE Sections.section_name = "value"
+SELECT Sections.section_name FROM Sections WHERE Sections.section_name = "value"
+easy:1.0
+easy:0.0
+
+What are the languages used by the least number of TV Channels and how many channels use it?
+SELECT LANGUAGE ,  count(*) FROM TV_Channel GROUP BY LANGUAGE ORDER BY count(*) ASC LIMIT 1;
+SELECT TV_Channel.Language , COUNT(*) FROM TV_Channel GROUP BY TV_Channel.Language ORDER BY COUNT(*) ASC LIMIT 1
+SELECT TV_Channel.Language , COUNT(*) FROM TV_Channel GROUP BY TV_Channel.Language ORDER BY COUNT(TV_Channel.Language) ASC LIMIT 1
+hard:1.0
+hard:0.0
+
+List the names of people that are not poker players.
+SELECT Name FROM people WHERE People_ID NOT IN (SELECT People_ID FROM poker_player)
+SELECT people.Name FROM people WHERE people.People_ID NOT IN ( SELECT poker_player.People_ID FROM poker_player )
+SELECT people.Name FROM people EXCEPT SELECT people.Name FROM people JOIN poker_player
+hard:1.0
+hard:0.0
+
+What are the names of people who do not play poker?
+SELECT Name FROM people WHERE People_ID NOT IN (SELECT People_ID FROM poker_player)
+SELECT people.Name FROM people WHERE people.People_ID NOT IN ( SELECT poker_player.People_ID FROM poker_player )
+SELECT people.Name FROM people EXCEPT SELECT people.Name FROM people JOIN poker_player
+hard:1.0
+hard:0.0
+
+How many states are there?
+SELECT count(*) FROM area_code_state
+SELECT COUNT(*) FROM AREA_CODE_STATE
+SELECT COUNT(AREA_CODE_STATE.state) FROM AREA_CODE_STATE
+easy:1.0
+easy:0.0
+
+What is the average GNP and total population in all nations whose government is US territory?
+SELECT avg(GNP) ,  sum(population) FROM country WHERE GovernmentForm  =  "US Territory"
+SELECT AVG(country.GNP) , SUM(country.Population) FROM country WHERE country.GovernmentForm = "value"
+SELECT AVG(country.GNP) , AVG(country.Population) FROM country WHERE country.GovernmentForm = "value"
+medium:1.0
+medium:0.0
+
+What is name of the country that speaks the largest number of languages?
+SELECT T1.Name FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode GROUP BY T1.Name ORDER BY COUNT(*) DESC LIMIT 1
+SELECT country.Name FROM country JOIN countrylanguage GROUP BY country.Name ORDER BY COUNT(*) DESC LIMIT 1
+SELECT country.Name FROM country JOIN countrylanguage GROUP BY countrylanguage.CountryCode ORDER BY COUNT(countrylanguage.Language) DESC LIMIT 1
+extra:1.0
+extra:0.0
+
+Give the name of the nation that uses the greatest amount of languages.
+SELECT T1.Name FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode GROUP BY T1.Name ORDER BY COUNT(*) DESC LIMIT 1
+SELECT country.Name FROM country JOIN countrylanguage GROUP BY country.Name ORDER BY COUNT(*) DESC LIMIT 1
+SELECT country.Name FROM country JOIN countrylanguage GROUP BY countrylanguage.CountryCode ORDER BY COUNT(countrylanguage.Language) DESC LIMIT 1
+extra:1.0
+extra:0.0
+
+Which continent has the most diverse languages?
+SELECT T1.Continent FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode GROUP BY T1.Continent ORDER BY COUNT(*) DESC LIMIT 1
+SELECT country.Continent FROM country JOIN countrylanguage GROUP BY country.Continent ORDER BY COUNT(*) DESC LIMIT 1
+SELECT country.Continent FROM country JOIN countrylanguage GROUP BY country.Continent ORDER BY COUNT(countrylanguage.Language) DESC LIMIT 1
+extra:1.0
+extra:0.0
+
+Which continent speaks the most languages?
+SELECT T1.Continent FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode GROUP BY T1.Continent ORDER BY COUNT(*) DESC LIMIT 1
+SELECT country.Continent FROM country JOIN countrylanguage GROUP BY country.Continent ORDER BY COUNT(*) DESC LIMIT 1
+SELECT country.Continent FROM country GROUP BY country.Continent ORDER BY COUNT(countrylanguage.Language) DESC LIMIT 1
+extra:1.0
+extra:0.0
+
+Which languages are spoken by only one country in republic governments?
+SELECT T2.Language FROM country AS T1 JOIN countrylanguage AS T2 ON T1.Code  =  T2.CountryCode WHERE T1.GovernmentForm  =  "Republic" GROUP BY T2.Language HAVING COUNT(*)  =  1
+SELECT countrylanguage.Language FROM country JOIN countrylanguage WHERE country.GovernmentForm = "value" GROUP BY countrylanguage.Language HAVING COUNT(*) = "value"
+SELECT countrylanguage.Language FROM countrylanguage JOIN country WHERE country.Name = "value" GROUP BY countrylanguage.Language HAVING COUNT(*) = "value"
+hard:1.0
+hard:0.0
+
+What are the countries that have greater surface area than any country in Europe?
+SELECT Name FROM country WHERE SurfaceArea  >  (SELECT min(SurfaceArea) FROM country WHERE Continent  =  "Europe")
+SELECT country.Name FROM country WHERE country.SurfaceArea > ( SELECT MIN(country.SurfaceArea) FROM country WHERE country.Continent = "value" )
+SELECT country.Name FROM country WHERE country.SurfaceArea > ( SELECT MAX(country.SurfaceArea) FROM country WHERE country.Continent = "value" )
+hard:1.0
+hard:0.0
+
+What are the country codes of countries where people use languages other than English?
+SELECT DISTINCT CountryCode FROM countrylanguage WHERE LANGUAGE != "English"
+SELECT countrylanguage.CountryCode FROM countrylanguage WHERE countrylanguage.Language != "value"
+SELECT country.Code FROM country JOIN countrylanguage WHERE countrylanguage.Language != "value"
+easy:1.0
+easy:0.0
+
+Give the country codes for countries in which people speak langauges that are not English.
+SELECT DISTINCT CountryCode FROM countrylanguage WHERE LANGUAGE != "English"
+SELECT countrylanguage.CountryCode FROM countrylanguage WHERE countrylanguage.Language != "value"
+SELECT country.Code FROM country WHERE countrylanguage.Language = "value" EXCEPT SELECT countrylanguage.CountryCode FROM countrylanguage WHERE countrylanguage.Language = "value"
+easy:1.0
+easy:0.0
+
+Return the names and surface areas of the 5 largest countries.
+SELECT Name ,  SurfaceArea FROM country ORDER BY SurfaceArea DESC LIMIT 5
+SELECT country.Name , country.SurfaceArea FROM country ORDER BY country.SurfaceArea DESC LIMIT 1
+SELECT country.Name , country.SurfaceArea FROM country ORDER BY country.Region DESC LIMIT 1
+medium:1.0
+medium:0.0
+
+What is the total population and average area of countries in the continent of North America whose area is bigger than 3000 ?
+select sum(population) ,  avg(surfacearea) from country where continent  =  "north america" and surfacearea  >  3000
+SELECT SUM(country.Population) , AVG(country.SurfaceArea) FROM country WHERE country.Continent = "value" AND country.SurfaceArea > "value"
+SELECT SUM(country.Population) , AVG(country.SurfaceArea) FROM country WHERE country.Continent = "value"
+hard:1.0
+hard:0.0
+
+Which language is spoken by the largest number of countries?
+SELECT LANGUAGE FROM countrylanguage GROUP BY LANGUAGE ORDER BY count(*) DESC LIMIT 1
+SELECT countrylanguage.Language FROM countrylanguage GROUP BY countrylanguage.Language ORDER BY COUNT(*) DESC LIMIT 1
+SELECT countrylanguage.Language FROM countrylanguage JOIN country GROUP BY countrylanguage.Language ORDER BY COUNT(*) DESC LIMIT 1
+hard:1.0
+hard:0.0
+
+Give the language that is spoken in the most countries.
+SELECT LANGUAGE FROM countrylanguage GROUP BY LANGUAGE ORDER BY count(*) DESC LIMIT 1
+SELECT countrylanguage.Language FROM countrylanguage GROUP BY countrylanguage.Language ORDER BY COUNT(*) DESC LIMIT 1
+SELECT countrylanguage.Language FROM countrylanguage JOIN country GROUP BY countrylanguage.Language ORDER BY COUNT(*) DESC LIMIT 1
+hard:1.0
+hard:0.0
+
+Show the names of conductors and the orchestras they have conducted.
+SELECT T1.Name ,  T2.Orchestra FROM conductor AS T1 JOIN orchestra AS T2 ON T1.Conductor_ID  =  T2.Conductor_ID
+SELECT conductor.Name , orchestra.Orchestra FROM conductor JOIN orchestra
+SELECT conductor.Name , orchestra.Orchestra FROM performance JOIN orchestra JOIN conductor JOIN orchestra
+medium:1.0
+medium:0.0
+
+What are the names of conductors as well as the corresonding orchestras that they have conducted?
+SELECT T1.Name ,  T2.Orchestra FROM conductor AS T1 JOIN orchestra AS T2 ON T1.Conductor_ID  =  T2.Conductor_ID
+SELECT conductor.Name , orchestra.Orchestra FROM conductor JOIN orchestra
+SELECT conductor.Name , orchestra.Orchestra FROM performance JOIN orchestra JOIN conductor
+medium:1.0
+medium:0.0
+
+What are the names of conductors who have conducted at more than one orchestra?
+SELECT T1.Name FROM conductor AS T1 JOIN orchestra AS T2 ON T1.Conductor_ID  =  T2.Conductor_ID GROUP BY T2.Conductor_ID HAVING COUNT(*)  >  1
+SELECT conductor.Name FROM conductor JOIN orchestra GROUP BY orchestra.Conductor_ID HAVING COUNT(*) > "value"
+SELECT conductor.Name FROM performance JOIN orchestra GROUP BY orchestra.Conductor_ID HAVING COUNT(*) > "value"
+medium:1.0
+medium:0.0
+
+Show the years in which orchestras that have given more than one performance are founded.
+SELECT Year_of_Founded FROM orchestra AS T1 JOIN performance AS T2 ON T1.Orchestra_ID  =  T2.Orchestra_ID GROUP BY T2.Orchestra_ID HAVING COUNT(*)  >  1
+SELECT orchestra.Year_of_Founded FROM performance JOIN orchestra GROUP BY performance.Orchestra_ID HAVING COUNT(*) > "value"
+SELECT orchestra.Year_of_Founded FROM performance JOIN orchestra GROUP BY orchestra.Year_of_Founded HAVING COUNT(*) > "value"
+medium:1.0
+medium:0.0
+
+Show the names of high schoolers who have at least 3 friends.
+SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id HAVING count(*)  >=  3
+SELECT Highschooler.name FROM Highschooler JOIN Friend GROUP BY Friend.student_id HAVING COUNT(*) >= "value"
+SELECT Highschooler.name FROM Highschooler JOIN Friend GROUP BY Highschooler.name HAVING COUNT(*) >= "value"
+medium:1.0
+medium:0.0
+
+How many friends does the high school student Kyle have?
+SELECT count(*) FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id WHERE T2.name  =  "Kyle"
+SELECT COUNT(*) FROM Highschooler JOIN Friend WHERE Highschooler.name = "value"
+SELECT COUNT(Friend.friend_id) FROM Highschooler JOIN Friend WHERE Highschooler.name = "value"
+medium:1.0
+medium:0.0
+
+Count the number of friends Kyle has.
+SELECT count(*) FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id WHERE T2.name  =  "Kyle"
+SELECT COUNT(*) FROM Highschooler JOIN Friend WHERE Highschooler.name = "value"
+SELECT COUNT(Friend.friend_id) FROM Highschooler JOIN Friend WHERE Highschooler.name = "value"
+medium:1.0
+medium:0.0
+
+Show the ids of high schoolers who have friends and are also liked by someone else.
+SELECT student_id FROM Friend INTERSECT SELECT liked_id FROM Likes
+SELECT Friend.student_id FROM Friend INTERSECT SELECT Likes.liked_id FROM Likes
+SELECT Highschooler.ID FROM Highschooler INTERSECT SELECT Likes.student_id FROM Likes
+hard:1.0
+hard:0.0
+
+What are the ids of students who both have friends and are liked?
+SELECT student_id FROM Friend INTERSECT SELECT liked_id FROM Likes
+SELECT Friend.student_id FROM Friend INTERSECT SELECT Likes.liked_id FROM Likes
+SELECT Friend.student_id FROM Friend INTERSECT SELECT Likes.student_id FROM Likes
+hard:1.0
+hard:0.0
+
+What is the name of the high schooler who has the greatest number of likes?
+SELECT T2.name FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id ORDER BY count(*) DESC LIMIT 1
+SELECT Highschooler.name FROM Highschooler JOIN Likes GROUP BY Likes.liked_id ORDER BY COUNT(*) DESC LIMIT 1
+SELECT Highschooler.name FROM Highschooler JOIN Likes GROUP BY Highschooler.name ORDER BY COUNT(*) DESC LIMIT 1
+extra:1.0
+extra:0.0
+
+How many likes does Kyle have?
+SELECT count(*) FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id WHERE T2.name  =  "Kyle"
+SELECT COUNT(*) FROM Highschooler JOIN Likes WHERE Highschooler.name = "value"
+SELECT COUNT(Likes.liked_id) FROM Likes JOIN Highschooler WHERE Highschooler.name = "value"
+medium:1.0
+medium:0.0
+
+Which breed do the most dogs have? Give me the breed name.
+SELECT T1.breed_name FROM Breeds AS T1 JOIN Dogs AS T2 ON T1.breed_code  =  T2.breed_code GROUP BY T1.breed_name ORDER BY count(*) DESC LIMIT 1
+SELECT Breeds.breed_name FROM Breeds JOIN Dogs GROUP BY Breeds.breed_name ORDER BY COUNT(*) DESC LIMIT 1
+SELECT Breeds.breed_name FROM Breeds JOIN Dogs GROUP BY Dogs.breed_code ORDER BY COUNT(*) DESC LIMIT 1
+extra:1.0
+extra:0.0
+
