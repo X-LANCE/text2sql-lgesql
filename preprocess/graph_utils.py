@@ -1,5 +1,6 @@
 #coding=utf8
 import math, dgl, torch
+import numpy as np
 from utils.constants import MAX_RELATIVE_DIST
 from utils.graph_example import GraphExample
 

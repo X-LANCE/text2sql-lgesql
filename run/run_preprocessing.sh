@@ -20,7 +20,7 @@ python3 -u preprocess/process_dataset.py --dataset_path ${dev_data} --table_path
 echo "Start to build word vocab for the dataset ..."
 python3 -u preprocess/build_glove_vocab.py --data_paths ${train_out} --table_path ${table_out} --reference_file ${vocab_glove} --mwf 4 --output_path ${vocab}
 echo "Start to construct graphs for the dataset ..."
-python3 -u preprocess/process_graphs.py --dataset_path ${train_out} --table_path ${table_out} --method 'rgatsql' --output_path ${train_rgatsql}
-python3 -u preprocess/process_graphs.py --dataset_path ${dev_out} --table_path ${table_out} --method 'rgatsql' --output_path ${dev_rgatsql}
+#python3 -u preprocess/process_graphs.py --dataset_path ${train_out} --table_path ${table_out} --method 'rgatsql' --output_path ${train_rgatsql}
+#python3 -u preprocess/process_graphs.py --dataset_path ${dev_out} --table_path ${table_out} --method 'rgatsql' --output_path ${dev_rgatsql}
 python3 -u preprocess/process_graphs.py --dataset_path ${train_out} --table_path ${table_out} --method 'lgesql' --output_path ${train_lgesql}
 python3 -u preprocess/process_graphs.py --dataset_path ${dev_out} --table_path ${table_out} --method 'lgesql' --output_path ${dev_lgesql}
