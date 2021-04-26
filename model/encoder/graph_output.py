@@ -5,8 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl.function as fn
 from model.model_utils import Registrable
-from model.encoder.rat import scaled_exp, div_by_z
-from model.encoder.lgnn import src_dot_dst
+from model.encoder.rgatsql import scaled_exp, div_by_z
+# from model.encoder.lgnn import src_dot_dst
 
 class ScoreFunction(nn.Module):
 
@@ -122,9 +122,9 @@ class DGLMHA(nn.Module):
     def forward(self, context, node, g):
         q, k, v = self.affine_q(self.feat_dropout(node)), self.affine_k(self.feat_dropout(context)), self.affine_v(self.feat_dropout(context))
         with g.local_scope():
-            g.nodes['node'].data['q'] = q.view(-1, self.num_heads, self.d_k)
-            g.nodes['context'].data['k'] = k.view(-1, self.num_heads, self.d_k)
-            g.nodes['context'].data['v'] = v.view(-1, self.num_heads, self.d_k)
+            g.nodes['schema'].data['q'] = q.view(-1, self.num_heads, self.d_k)
+            g.nodes['question'].data['k'] = k.view(-1, self.num_heads, self.d_k)
+            g.nodes['question'].data['v'] = v.view(-1, self.num_heads, self.d_k)
             out_x = self.propagate_attention(g)
         return self.affine_o(out_x.view(-1, self.hidden_size))
 
@@ -135,5 +135,12 @@ class DGLMHA(nn.Module):
         # Update node state
         g.update_all(fn.src_mul_edge('v', 'score', 'v'), fn.sum('v', 'wv'))
         g.update_all(fn.copy_edge('score', 'score'), fn.sum('score', 'z'), div_by_z('wv', 'z', 'o'))
-        out_x = g.nodes['node'].data['o']
+        out_x = g.nodes['schema'].data['o']
         return out_x
+
+
+def src_dot_dst(src_field, dst_field, out_field):
+    def func(edges):
+        return {out_field: (edges.src[src_field] * edges.dst[dst_field]).sum(-1, keepdim=True)}
+
+    return func

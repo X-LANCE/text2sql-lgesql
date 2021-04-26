@@ -11,9 +11,9 @@ def process_dataset_graph(processor, dataset, tables, method, output_path=None):
             continue
         if (idx + 1) % 500 == 0:
             print('Processing the %d-th example ...' % (idx + 1))
-        entry['graph'] = processor.process_graph_utils(entry, db, method=method)
+        entry = processor.process_graph_utils(entry, db, method=method)
         processed_dataset.append(entry)
-    print('In total, process %d samples .' % (len(processed_dataset)))
+    print('In total, process %d samples, skip %d samples .' % (len(processed_dataset), len(dataset) - len(processed_dataset)))
     if output_path is not None:
         # serialize preprocessed dataset
         pickle.dump(processed_dataset, open(output_path, 'wb'))

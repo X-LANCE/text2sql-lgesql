@@ -126,18 +126,21 @@ class Example():
 def shuffle_position_ids(ex):
     # cluster columns with their corresponding table and randomly shuffle tables and columns
     # [CLS] q1 q2 ... [SEP] * t1 c1 c2 c3 t2 c4 c5 ... [SEP]
-    table_num, column_num = len(db['table_names']), len(db['column_names'])
     db, table_word_len, column_word_len = ex.db, ex.table_word_len, ex.column_word_len
+    table_num, column_num = len(db['table_names']), len(db['column_names'])
     question_position_id = list(range(len(ex.question_id)))
     start = len(question_position_id)
     table_position_id, column_position_id = [None] * table_num, [None] * column_num
     column_position_id[0] = list(range(start, start + column_word_len[0]))
     start += column_word_len[0] # special symbol * first
-    for idx in random.shuffle(list(range(table_num))):
+    table_idxs = list(range(table_num))
+    random.shuffle(table_idxs)
+    for idx in table_idxs:
         col_idxs = db['table2columns'][idx]
         table_position_id[idx] = list(range(start, start + table_word_len[idx]))
         start += table_word_len[idx]
-        for col_id in random.shuffle(col_idxs):
+        random.shuffle(col_idxs)
+        for col_id in col_idxs:
             column_position_id[col_id] = list(range(start, start + column_word_len[col_id]))
             start += column_word_len[col_id]
     position_id = question_position_id + list(chain.from_iterable(table_position_id)) + \

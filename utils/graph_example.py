@@ -119,5 +119,5 @@ class GraphFactory():
         node_label = torch.cat([ex.node_label for ex in graph_list], dim=0)
         node_label = node_label.masked_fill_(~ node_label.bool(), 2 * smoothing) - smoothing
         bg.node_label = node_label.to(device)
-        bg.gp = dgl.batch([ex.gp_ng for ex in graph_list]).to(device)
+        bg.gp = dgl.batch([ex.gp for ex in graph_list]).to(device)
         return bg

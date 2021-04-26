@@ -58,7 +58,7 @@ def decode(choice, output_path, acc_type='sql'):
     all_hyps = []
     with torch.no_grad():
         for i in range(0, len(dataset), args.batch_size):
-            current_batch = Batch.from_example_list(dataset[i: i + args.batch_size], device, train=False, method='hetgnn')
+            current_batch = Batch.from_example_list(dataset[i: i + args.batch_size], device, train=False, method='text2sql')
             hyps = model.parse(current_batch, args.beam_size)
             all_hyps.extend(hyps)
         acc = evaluator.acc(all_hyps, dataset, output_path, acc_type=acc_type, etype='match')
