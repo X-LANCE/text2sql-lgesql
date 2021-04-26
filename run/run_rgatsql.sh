@@ -37,7 +37,7 @@ no_parent_state=''
 
 decode_max_step=100
 batch_size=20
-grad_accumulate=2
+grad_accumulate=4
 lr=2e-4
 layerwise_decay=0.8
 l2=0.1
