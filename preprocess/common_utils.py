@@ -1,11 +1,10 @@
 #coding=utf8
 import os, sqlite3
 import numpy as np
-import stanza, torch, dgl, math
+import stanza, torch
 from nltk.corpus import stopwords
 from itertools import product, combinations
 from utils.constants import MAX_RELATIVE_DIST
-from utils.graph_utils import GraphExample
 
 def is_number(s):
     try:
@@ -78,7 +77,7 @@ class Preprocessor():
         t_num, c_num, dtype = len(db['table_names']), len(db['column_names']), '<U100'
 
         # relations in tables, tab_num * tab_num
-        tab_mat = np.array([['table-table'] * t_num for _ in range(t_num)], dtype=dtype)
+        tab_mat = np.array([['table-table-generic'] * t_num for _ in range(t_num)], dtype=dtype)
         table_fks = set(map(lambda pair: (column2table[pair[0]], column2table[pair[1]]), db['foreign_keys']))
         for (tab1, tab2) in table_fks:
             if (tab2, tab1) in table_fks:
@@ -88,7 +87,7 @@ class Preprocessor():
         tab_mat[list(range(t_num)), list(range(t_num))] = 'table-table-identity'
 
         # relations in columns, c_num * c_num
-        col_mat = np.array([['column-column'] * c_num for _ in range(c_num)], dtype=dtype)
+        col_mat = np.array([['column-column-generic'] * c_num for _ in range(c_num)], dtype=dtype)
         for i in range(t_num):
             col_ids = [idx for idx, t in enumerate(column2table) if t == i]
             col1, col2 = list(zip(*list(product(col_ids, col_ids))))
@@ -97,20 +96,20 @@ class Preprocessor():
         if len(db['foreign_keys']) > 0:
             col1, col2 = list(zip(*db['foreign_keys']))
             col_mat[col1, col2], col_mat[col2, col1] = 'column-column-fk', 'column-column-fkr'
-        col_mat[0, list(range(c_num))] = '*-column'
-        col_mat[list(range(c_num)), 0] = 'column-*'
+        col_mat[0, list(range(c_num))] = '*-column-generic'
+        col_mat[list(range(c_num)), 0] = 'column-*-generic'
         col_mat[0, 0] = '*-*-identity'
 
         # relations between tables and columns, t_num*c_num and c_num*t_num
-        tab_col_mat = np.array([['table-column'] * c_num for _ in range(t_num)], dtype=dtype)
-        col_tab_mat = np.array([['column-table'] * t_num for _ in range(c_num)], dtype=dtype)
+        tab_col_mat = np.array([['table-column-generic'] * c_num for _ in range(t_num)], dtype=dtype)
+        col_tab_mat = np.array([['column-table-generic'] * t_num for _ in range(c_num)], dtype=dtype)
         cols, tabs = list(zip(*list(map(lambda x: (x, column2table[x]), range(1, c_num))))) # ignore *
         col_tab_mat[cols, tabs], tab_col_mat[tabs, cols] = 'column-table-has', 'table-column-has'
         if len(db['primary_keys']) > 0:
             cols, tabs = list(zip(*list(map(lambda x: (x, column2table[x]), db['primary_keys']))))
             col_tab_mat[cols, tabs], tab_col_mat[tabs, cols] = 'column-table-pk', 'table-column-pk'
-        col_tab_mat[0, list(range(t_num))] = '*-table'
-        tab_col_mat[list(range(t_num)), 0] = 'table-*'
+        col_tab_mat[0, list(range(t_num))] = '*-table-generic'
+        tab_col_mat[list(range(t_num)), 0] = 'table-*-generic'
 
         relations = np.concatenate([
             np.concatenate([tab_mat, tab_col_mat], axis=1),
@@ -141,12 +140,14 @@ class Preprocessor():
         # relations in questions, q_num * q_num
         q_num, dtype = len(toks), '<U100'
         if q_num <= MAX_RELATIVE_DIST + 1:
-            dist_vec = ['question-question-dist' + str(i) for i in range(- MAX_RELATIVE_DIST, MAX_RELATIVE_DIST + 1, 1)]
+            dist_vec = ['question-question-dist' + str(i) if i != 0 else 'question-question-identity'
+                for i in range(- MAX_RELATIVE_DIST, MAX_RELATIVE_DIST + 1, 1)]
             starting = MAX_RELATIVE_DIST
         else:
-            dist_vec = ['question-question'] * (q_num - MAX_RELATIVE_DIST - 1) + \
-                ['question-question-dist' + str(i) for i in range(- MAX_RELATIVE_DIST, MAX_RELATIVE_DIST + 1, 1)] + \
-                    ['question-question'] * (q_num - MAX_RELATIVE_DIST - 1)
+            dist_vec = ['question-question-generic'] * (q_num - MAX_RELATIVE_DIST - 1) + \
+                ['question-question-dist' + str(i) if i != 0 else 'question-question-identity' \
+                    for i in range(- MAX_RELATIVE_DIST, MAX_RELATIVE_DIST + 1, 1)] + \
+                    ['question-question-generic'] * (q_num - MAX_RELATIVE_DIST - 1)
             starting = q_num - 1
         q_mat = np.array([dist_vec[starting - i: starting - i + q_num] for i in range(q_num)], dtype=dtype)
         entry['relations'] = q_mat.tolist()
@@ -320,8 +321,8 @@ class Preprocessor():
             conn.close()
 
         # two symmetric schema linking matrix: q_num x (t_num + c_num), (t_num + c_num) x q_num
-        q_col_mat[:, 0] = 'question-*'
-        col_q_mat[0] = '*-question'
+        q_col_mat[:, 0] = 'question-*-generic'
+        col_q_mat[0] = '*-question-generic'
         q_schema = np.concatenate([q_tab_mat, q_col_mat], axis=1)
         schema_q = np.concatenate([tab_q_mat, col_q_mat], axis=0)
         entry['schema_linking'] = (q_schema.tolist(), schema_q.tolist())
@@ -336,90 +337,3 @@ class Preprocessor():
             print('Partial match:', ', '.join(column_matched_pairs['partial']) if column_matched_pairs['partial'] else 'empty')
             print('Value match:', ', '.join(column_matched_pairs['value']) if column_matched_pairs['value'] else 'empty', '\n')
         return entry
-
-    def prepare_graph(self, ex: dict, db: dict):
-        """ Example should be preprocessed by self.pipeline
-        """
-        q = np.array(ex['relations'], dtype='<U100')
-        s = np.array(db['relations'], dtype='<U100')
-        q_s = np.array(ex['schema_linking'][0], dtype='<U100')
-        s_q = np.array(ex['schema_linking'][1], dtype='<U100')
-        relation = np.concatenate([
-            np.concatenate([q, q_s], axis=1),
-            np.concatenate([s_q, s], axis=1)
-        ], axis=0)
-        relation = relation.flatten().tolist()
-
-        filter_relations = [
-            'question-question', 'table-table', 'column-column', 'table-column', 'column-table',
-            'question-question-dist-2', 'question-question-dist2'
-            'table-table-fk', 'table-table-fkr', 'table-table-fkb', 'column-column-sametable',
-            '*-column', 'column-*',
-            # '*-table', 'table-*',
-            # 'table-question-nomatch', 'question-table-nomatch', 'column-question-nomatch', 'question-column-nomatch', 'question-*', '*-question',
-            'cls-cls-identity', 'question-question-dist0', 'table-table-identity', 'column-column-identity', '*-*-identity'
-        ]
-        # filter some relations to avoid too many nodes in the line graph
-        relation_mapping_dict = {
-            'question-*': 'question-column-nomatch',
-            '*-question': 'column-question-nomatch',
-            'table-*': 'table-column-has',
-            '*-table': 'column-table-has',
-            '*-column': 'column-column',
-            'column-*': 'column-column',
-            '*-*-identity': 'column-column-identity'
-        }
-        graph = GraphExample()
-        num_nodes = int(math.sqrt(len(relation)))
-        edges = [(idx // num_nodes, idx % num_nodes, (relation_mapping_dict[r] if r in relation_mapping_dict else r))
-            for idx, r in enumerate(relation) if r not in filter_relations]
-        graph.edges = edges
-        extra_edges = [(idx // num_nodes, idx % num_nodes, (relation_mapping_dict[r] if r in relation_mapping_dict else r))
-            for idx, r in enumerate(relation) if r in filter_relations]
-        full_edges = edges + extra_edges
-        src_ids, dst_ids = list(map(lambda r: r[0], full_edges)), list(map(lambda r: r[1], full_edges))
-        graph.full_edges = full_edges
-        graph.full_g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)
-        num_edges = len(edges)
-        src_ids, dst_ids = list(map(lambda r: r[0], edges)), list(map(lambda r: r[1], edges))
-
-        graph.g = dgl.graph((src_ids, dst_ids), num_nodes=num_nodes, idtype=torch.int32)
-        lg = graph.g.line_graph(backtracking=False)
-        match_ids = [idx for idx, r in enumerate(edges) if 'match' in r[2]]
-        src, dst, eids = lg.edges(form='all', order='eid')
-        eids = [e for u, v, e in zip(src.tolist(), dst.tolist(), eids.tolist()) if not (u in match_ids and v in match_ids)]
-        graph.lg = lg.edge_subgraph(eids, preserve_nodes=True).remove_self_loop().add_self_loop()
-
-        # graph pruning for nodes
-        q_num = len(ex['processed_question_toks'])
-        s_num = num_nodes - q_num
-        graph.context_index = [1] * q_num + [0] * s_num
-        graph.node_index = [0] * q_num + [1] * s_num
-        graph.gp_ng = dgl.heterograph({
-            ('context', 'to', 'node'): (list(range(q_num)) * s_num,
-            [i for i in range(s_num) for _ in range(q_num)])
-            }, num_nodes_dict={'context': q_num, 'node': s_num}, idtype=torch.int32
-        )
-        t_num = len(db['processed_table_toks'])
-        def check_node(i):
-            if i < t_num and i in ex['used_tables']:
-                return 1.0
-            elif i >= t_num and i - t_num in ex['used_columns']:
-                return 1.0
-            else: return 0.0
-        graph.node_label = list(map(check_node, range(s_num)))
-
-        # graph pruning for edges
-        graph.edge_index = list(map(lambda e: 1 if e[0] >= q_num and e[1] >= q_num else 0, edges))
-        e_num = sum(graph.edge_index)
-        graph.gp_eg = dgl.heterograph({
-            ('context', 'to', 'node'): (list(range(q_num)) * e_num,
-            [i for i in range(e_num) for _ in range(q_num)])
-            }, num_nodes_dict={'context': q_num, 'node': e_num}, idtype=torch.int32
-        )
-        def check_edge(t):
-            if check_node(t[0]) + check_node(t[1]) > 1.5:
-                return 1.0
-            else: return 0.0
-        graph.edge_label = list(map(check_edge, filter(lambda e: e[0] >= q_num and e[1] >= q_num, edges)))
-        return graph
