@@ -55,18 +55,19 @@ class GraphFactory():
         # return graph
 
     def fast_lgnn(self, ex, db):
-        graph = GraphExample()
-        edges = ex['graph'].edges
-        rel_ids = list(map(lambda r: self.relation_vocab[r[2]], edges))
-        graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
-        graph.g, graph.lg = ex['graph'].g, ex['graph'].lg
-        graph.gp_ng, graph.gp_eg = ex['graph'].gp_ng, ex['graph'].gp_eg
-        graph.context_index = torch.tensor(ex['graph'].context_index, dtype=torch.bool)
-        graph.node_index = torch.tensor(ex['graph'].node_index, dtype=torch.bool)
-        graph.edge_index = torch.tensor(ex['graph'].edge_index, dtype=torch.bool)
-        graph.node_label = torch.tensor(ex['graph'].node_label, dtype=torch.float)
-        graph.edge_label = torch.tensor(ex['graph'].edge_label, dtype=torch.float)
-        return graph
+        pass
+        # graph = GraphExample()
+        # edges = ex['graph'].edges
+        # rel_ids = list(map(lambda r: self.relation_vocab[r[2]], edges))
+        # graph.edge_feat = torch.tensor(rel_ids, dtype=torch.long)
+        # graph.g, graph.lg = ex['graph'].g, ex['graph'].lg
+        # graph.gp_ng, graph.gp_eg = ex['graph'].gp_ng, ex['graph'].gp_eg
+        # graph.context_index = torch.tensor(ex['graph'].context_index, dtype=torch.bool)
+        # graph.node_index = torch.tensor(ex['graph'].node_index, dtype=torch.bool)
+        # graph.edge_index = torch.tensor(ex['graph'].edge_index, dtype=torch.bool)
+        # graph.node_label = torch.tensor(ex['graph'].node_label, dtype=torch.float)
+        # graph.edge_label = torch.tensor(ex['graph'].edge_label, dtype=torch.float)
+        # return graph
 
     def batch_graphs(self, ex_list, device, train=True, **kwargs):
         """ Batch graphs in example list """
@@ -107,21 +108,16 @@ class GraphFactory():
         bg.gp_eg = dgl.batch([ex.gp_eg for ex in graph_list]).to(device)
         return bg
 
-    def batch_rat(self, ex_list, device, train=True, **kwargs):
+    def batch_rgatsql(self, ex_list, device, train=True, **kwargs):
         graph_list = [ex.graph for ex in ex_list]
         bg = BatchedGraph()
-        bg.g = dgl.batch([ex.g for ex in graph_list]).to(device)
-        bg.edge_feat = torch.cat([ex.edge_feat for ex in graph_list], dim=0).to(device)
-        bg.context_index = torch.cat([ex.context_index for ex in graph_list], dim=0).to(device)
-        bg.node_index = torch.cat([ex.node_index for ex in graph_list], dim=0).to(device)
+        bg.global_g = dgl.batch([ex.global_g for ex in graph_list]).to(device)
+        bg.global_edges = torch.cat([ex.global_edges for ex in graph_list], dim=0).to(device)
+        bg.question_mask = torch.cat([ex.question_mask for ex in graph_list], dim=0).to(device)
+        bg.schema_mask = torch.cat([ex.schema_mask for ex in graph_list], dim=0).to(device)
         smoothing = kwargs.pop('smoothing', 0.0)
         node_label = torch.cat([ex.node_label for ex in graph_list], dim=0)
         node_label = node_label.masked_fill_(~ node_label.bool(), 2 * smoothing) - smoothing
         bg.node_label = node_label.to(device)
-        # bg.edge_index = torch.cat([ex.edge_index for ex in graph_list], dim=0).to(device)
-        # edge_label = torch.cat([ex.edge_label for ex in graph_list], dim=0)
-        # edge_label = edge_label.masked_fill_(~ edge_label.bool(), 2 * smoothing) - smoothing
-        # bg.edge_label = edge_label.to(device)
-        bg.gp_ng = dgl.batch([ex.gp_ng for ex in graph_list]).to(device)
-        # bg.gp_eg = dgl.batch([ex.gp_eg for ex in graph_list]).to(device)
+        bg.gp = dgl.batch([ex.gp_ng for ex in graph_list]).to(device)
         return bg

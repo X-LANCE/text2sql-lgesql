@@ -1,7 +1,7 @@
 #coding=utf8
 import torch
 import numpy as np
-from utils.example import Example
+from utils.example import Example, shuffle_position_ids
 from utils.constants import PAD, UNK
 from model.model_utils import lens2mask, cached_property
 import torch.nn.functional as F
@@ -52,7 +52,7 @@ def from_example_list_base(ex_list, device='cpu', train=True):
         batch.inputs["attention_mask"] = torch.tensor(attention_mask, dtype=torch.float, device=device)
         token_type_ids = [ex.segment_id + [0] * (max_len - len(ex.segment_id)) for ex in ex_list]
         batch.inputs["token_type_ids"] = torch.tensor(token_type_ids, dtype=torch.long, device=device)
-        position_ids = [ex.position_id + [0] * (max_len - len(ex.position_id)) for ex in ex_list]
+        position_ids = [shuffle_position_ids(ex) + [0] * (max_len - len(ex.input_id)) for ex in ex_list]
         batch.inputs["position_ids"] = torch.tensor(position_ids, dtype=torch.long, device=device)
         # extract representations after ptm, remove [SEP]
         question_mask_ptm = [ex.question_mask_ptm + [0] * (max_len - len(ex.question_mask_ptm)) for ex in ex_list]
@@ -105,7 +105,7 @@ def from_example_list_base(ex_list, device='cpu', train=True):
                 batch.column_unk_embeddings = torch.tensor([e for e in unk_word_embeddings if e is not None], dtype=torch.float, device=device)
     return batch
 
-def from_example_list_hetgnn(ex_list, device='cpu', train=True, **kwargs):
+def from_example_list_text2sql(ex_list, device='cpu', train=True, **kwargs):
     """ New fields: batch.lens, batch.max_len, batch.relations, batch.relations_mask
     """
     batch = from_example_list_base(ex_list, device, train)
@@ -122,9 +122,9 @@ class Batch():
         self.device = device
 
     @classmethod
-    def from_example_list(cls, ex_list, device='cpu', train=True, method='hetgnn', **kwargs):
+    def from_example_list(cls, ex_list, device='cpu', train=True, method='text2sql', **kwargs):
         method_dict = {
-            "hetgnn": from_example_list_hetgnn,
+            "text2sql": from_example_list_text2sql,
         }
         return method_dict[method](ex_list, device, train=train, **kwargs)
 
@@ -133,14 +133,6 @@ class Batch():
 
     def __getitem__(self, idx):
         return self.examples[idx]
-
-    # @cached_property
-    # def lens(self):
-        # return self.question_lens + self.table_lens + self.column_lens
-
-    # @cached_property
-    # def max_len(self):
-        # return torch.max(self.lens).item()
 
     @cached_property
     def max_question_len(self):

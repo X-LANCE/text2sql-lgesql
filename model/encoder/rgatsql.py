@@ -6,11 +6,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from model.model_utils import Registrable, FFN
 
-@Registrable.register('rat')
-class RAT(nn.Module):
+@Registrable.register('rgatsql')
+class RGATSQL(nn.Module):
 
     def __init__(self, args):
-        super(RAT, self).__init__()
+        super(RGATSQL, self).__init__()
         self.num_layers = args.gnn_num_layers
         self.relation_num = args.relation_num
         self.relation_share_layers, self.relation_share_heads = args.relation_share_layers, args.relation_share_heads
@@ -19,21 +19,21 @@ class RAT(nn.Module):
             self.relation_embed = nn.Embedding(args.relation_num, edim)
         else:
             self.relation_embed = nn.ModuleList([nn.Embedding(args.relation_num, edim) for _ in range(self.num_layers)])
-        self.gnn_layers = nn.ModuleList([RATLayer(args.gnn_hidden_size, edim, num_heads=args.num_heads, feat_drop=args.dropout)
+        self.gnn_layers = nn.ModuleList([RGATLayer(args.gnn_hidden_size, edim, num_heads=args.num_heads, feat_drop=args.dropout)
             for _ in range(self.num_layers)])
 
     def forward(self, x, batch):
         if self.relation_share_layers:
-            lg_x = self.relation_embed(batch.graph.edge_feat)
+            lg_x = self.relation_embed(batch.graph.global_edges)
         for i in range(self.num_layers):
-            lg_x = self.relation_embed[i](batch.graph.edge_feat) if not self.relation_share_layers else lg_x
-            x, lg_x = self.gnn_layers[i](x, lg_x, batch.graph.g)
+            lg_x = self.relation_embed[i](batch.graph.global_edges) if not self.relation_share_layers else lg_x
+            x, lg_x = self.gnn_layers[i](x, lg_x, batch.graph.global_g)
         return x, lg_x
 
-class RATLayer(nn.Module):
+class RGATLayer(nn.Module):
 
     def __init__(self, ndim, edim, num_heads=8, feat_drop=0.2):
-        super(RATLayer, self).__init__()
+        super(RGATLayer, self).__init__()
         self.ndim, self.edim = ndim, edim
         self.num_heads = num_heads
         self.d_k = self.ndim // self.num_heads
@@ -70,7 +70,6 @@ class RATLayer(nn.Module):
         g.apply_edges(scaled_exp('score', math.sqrt(self.d_k)))
         # Update node state
         g.update_all(src_sum_edge_mul_edge('v', 'e', 'score', 'v'), fn.sum('v', 'wv'))
-        # g.update_all(fn.src_mul_edge('v', 'score', 'v'), fn.sum('v', 'wv'))
         g.update_all(fn.copy_edge('score', 'score'), fn.sum('score', 'z'), div_by_z('wv', 'z', 'o'))
         out_x = g.ndata['o']
         return out_x

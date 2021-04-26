@@ -6,9 +6,12 @@ from preprocess.graph_utils import GraphProcessor
 def process_dataset_graph(processor, dataset, tables, method, output_path=None):
     processed_dataset = []
     for idx, entry in enumerate(dataset):
+        db = tables[entry['db_id']]
+        if len(db['column_names']) > 100:
+            continue
         if (idx + 1) % 500 == 0:
-            print('Processing the %d-th example ...' % (idx))
-        entry['graph'] = processor.process_graph_utils(entry, tables[entry['db_id']], method=method)
+            print('Processing the %d-th example ...' % (idx + 1))
+        entry['graph'] = processor.process_graph_utils(entry, db, method=method)
         processed_dataset.append(entry)
     print('In total, process %d samples .' % (len(processed_dataset)))
     if output_path is not None:

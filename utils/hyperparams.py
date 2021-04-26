@@ -6,15 +6,15 @@ EXP_PATH = 'exp'
 def hyperparam_path(args):
     if args.read_model_path and args.testing:
         return args.read_model_path
-    exp_path = hyperparam_path_hetgnn(args)
-    return os.path.join(EXP_PATH, args.task, exp_path)
+    exp_path = hyperparam_path_text2sql(args)
+    exp_path = os.path.join(EXP_PATH, args.task, exp_path)
+    if not os.path.exists(exp_path):
+        os.makedirs(exp_path)
+    return exp_path
 
-def hyperparam_path_hetgnn(args):
+def hyperparam_path_text2sql(args):
     exp_path = '%s' % (args.model) if 'without' in args.output_model else \
-        '%s_gp_%s_%s' % (args.model, args.prune_type, args.smoothing)
-    exp_path += '_cls' if args.add_cls else ''
-    exp_path += '__%s' % (args.position)
-    # exp_path += '__q_%s_k_%s_v_%s' % (args.q, args.k, args.v)
+        '%s_gp_%s' % (args.model, args.smoothing)
     # encoder params
     exp_path += '__emb_%s' % (args.embed_size) if args.ptm is None else '__ptm_%s' % (args.ptm)
     exp_path += '__gnn_%s_x_%s' % (args.gnn_hidden_size, args.gnn_num_layers)

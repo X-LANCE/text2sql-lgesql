@@ -1,14 +1,11 @@
-task=ratsql
+task=rgatsql
 seed=999
 device=0
 testing='' #'--testing'
-read_model_path='' #'--read_model_path exp/ratsql/emb_300__gnn_256_x_8__head_8__dp_0.2__attndp_0.0__cell_onlstm_512_x_1_chunk_8__attvec_512__jointcxt_no__ae_128__fe_64__te_64__init_0.2__bsize_20__lr_0.0005__l2_0.0001__warmup_0.1__schedule_linear__me_100__mn_5.0__beam_5/'
+read_model_path=''
 
-model=rat
+model=rgatsql
 output_model=with_pruning
-prune_type=node
-add_cls=''
-#ptm="--ptm electra-base-discriminator"
 ptm='' #"--ptm bert-base-uncased"
 embed_size=300
 subword_aggregation=attentive-pooling
@@ -52,9 +49,9 @@ max_epoch=100
 max_norm=5
 beam_size=5
 
-python scripts/hetgnn.py --task $task --seed $seed --device $device $testing $read_model_path \
+python scripts/text2sql.py --task $task --seed $seed --device $device $testing $read_model_path \
     $ptm --gnn_hidden_size $gnn_hidden_size --dropout $dropout --attn_drop $attn_drop --att_vec_size $att_vec_size \
-    --model $model --output_model $output_model --prune_type $prune_type --score_function $score_function $add_cls $relation_share_layers $relation_share_heads \
+    --model $model --output_model $output_model --score_function $score_function $relation_share_layers $relation_share_heads \
     --subword_aggregation $subword_aggregation --schema_aggregation $schema_aggregation --embed_size $embed_size --gnn_num_layers $gnn_num_layers --num_heads $num_heads $sep_cxt \
     --lstm $lstm --chunk_size $chunk_size --drop_connect $drop_connect --lstm_hidden_size $lstm_hidden_size --lstm_num_layers $lstm_num_layers --decode_max_step $decode_max_step \
     --action_embed_size $action_embed_size --field_embed_size $field_embed_size --type_embed_size $type_embed_size \

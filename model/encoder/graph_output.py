@@ -57,7 +57,7 @@ class GraphOutputLayer(nn.Module):
         super(GraphOutputLayer, self).__init__()
         self.hidden_size = args.gnn_hidden_size
 
-    def forward(self, inputs, lg_inputs, batch):
+    def forward(self, inputs, batch):
         """ Re-scatter data format:
                 inputs: sum(q_len + t_len + c_len) x hidden_size
                 outputs: bsize x (max_q_len + max_t_len + max_c_len) x hidden_size
@@ -75,49 +75,34 @@ class GraphOutputLayerWithPruning(nn.Module):
     def __init__(self, args):
         super(GraphOutputLayerWithPruning, self).__init__()
         self.hidden_size = args.gnn_hidden_size
-        edim = self.hidden_size // args.num_heads if args.relation_share_heads else \
-            self.hidden_size if args.model != 'lgnn_concat_rat' else self.hidden_size // 2
-        self.graph_pruning = GraphPruning(self.hidden_size, args.num_heads, args.dropout, args.score_function, args.prune_type, edim)
+        self.graph_pruning = GraphPruning(self.hidden_size, args.num_heads, args.dropout, args.score_function)
 
-    def forward(self, inputs, lg_inputs, batch):
+    def forward(self, inputs, batch):
         outputs = inputs.new_zeros(len(batch), batch.mask.size(1), self.hidden_size)
         outputs = outputs.masked_scatter_(batch.mask.unsqueeze(-1), inputs)
 
         if self.training:
-            # extract context, node and edge feats
             g = batch.graph
-            context = inputs.masked_select(g.context_index.unsqueeze(-1)).view(-1, self.hidden_size)
-            node = inputs.masked_select(g.node_index.unsqueeze(-1)).view(-1, self.hidden_size)
-            edge = lg_inputs.masked_select(g.edge_index.unsqueeze(-1)).view(-1, lg_inputs.size(-1))
-            loss = self.graph_pruning(context, node, edge, g.gp_ng, g.gp_eg, g.node_label, g.edge_label)
+            question = inputs.masked_select(g.question_mask.unsqueeze(-1)).view(-1, self.hidden_size)
+            schema = inputs.masked_select(g.schema_mask.unsqueeze(-1)).view(-1, self.hidden_size)
+            loss = self.graph_pruning(question, schema, g.gp, g.node_label)
             return outputs, batch.mask, loss
         else:
             return outputs, batch.mask
 
 class GraphPruning(nn.Module):
 
-    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2, score_function='affine', prune_type='both', edim=None):
+    def __init__(self, hidden_size, num_heads=8, feat_drop=0.2, score_function='affine'):
         super(GraphPruning, self).__init__()
         self.hidden_size = hidden_size
-        self.prune_type = prune_type
-        if self.prune_type != 'edge':
-            self.node_mha = DGLMHA(hidden_size, hidden_size, num_heads, feat_drop)
-            self.node_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
-        if self.prune_type != 'node':
-            self.edge_mha = DGLMHA(hidden_size, edim, num_heads, feat_drop)
-            self.edge_score_function = ScoreFunction(edim, mlp=2, method=score_function)
+        self.node_mha = DGLMHA(hidden_size, hidden_size, num_heads, feat_drop)
+        self.node_score_function = ScoreFunction(self.hidden_size, mlp=2, method=score_function)
         self.loss_function = nn.BCEWithLogitsLoss(reduction='sum')
 
-    def forward(self, context, node, edge, ng, eg, nl, el):
-        loss = torch.tensor(0., dtype=torch.float).to(context.device)
-        if self.prune_type != 'edge':
-            node_context = self.node_mha(context, node, ng)
-            node_score = self.node_score_function(node_context, node)
-            loss += self.loss_function(node_score, nl)
-        if self.prune_type != 'node':
-            edge_context = self.edge_mha(context, edge, eg)
-            edge_score = self.edge_score_function(edge_context, edge)
-            loss += self.loss_function(edge_score, el)
+    def forward(self, question, schema, graph, node_label):
+        node_context = self.node_mha(question, schema, graph)
+        node_score = self.node_score_function(node_context, schema)
+        loss = self.loss_function(node_score, node_label)
         return loss
 
 class DGLMHA(nn.Module):

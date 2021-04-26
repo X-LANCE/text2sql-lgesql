@@ -5,11 +5,11 @@ from model.model_utils import Registrable, PoolingFunction
 from model.encoder.graph_encoder import *
 from model.decoder.sql_parser import *
 
-@Registrable.register('hetgnn-sql')
-class HetGNNSQL(nn.Module):
+@Registrable.register('text2sql')
+class Text2SQL(nn.Module):
     def __init__(self, args, transition_system):
-        super(HetGNNSQL, self).__init__()
-        self.encoder = Registrable.by_name('encoder_hetgnn')(args)
+        super(Text2SQL, self).__init__()
+        self.encoder = Registrable.by_name('encoder_text2sql')(args)
         self.encoder2decoder = PoolingFunction(args.gnn_hidden_size, args.lstm_hidden_size, method='attentive-pooling')
         self.decoder = Registrable.by_name('decoder_tranx')(args, transition_system)
 
@@ -32,8 +32,8 @@ class HetGNNSQL(nn.Module):
             while reverse_mappings perform the opposite function, mapping local ids to database ids
             """
             hyps.append(self.decoder.parse(encodings[i:i+1], mask[i:i+1], h0[i:i+1], batch, beam_size,
-            table_mapping=batch.table_mappings[i], column_mapping=batch.column_mappings[i],
-            table_reverse_mapping=batch.table_reverse_mappings[i], column_reverse_mapping=batch.column_reverse_mappings[i]))
+                table_mapping=batch.table_mappings[i], column_mapping=batch.column_mappings[i],
+                table_reverse_mapping=batch.table_reverse_mappings[i], column_reverse_mapping=batch.column_reverse_mappings[i]))
         return hyps
 
     def pad_embedding_grad_zero(self, index=None):

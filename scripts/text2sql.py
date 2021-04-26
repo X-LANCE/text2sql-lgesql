@@ -14,8 +14,6 @@ from model.model_constructor import *
 # initialization params, output path, logger, random seed and torch.device
 args = init_args(sys.argv[1:])
 exp_path = hyperparam_path(args)
-if not os.path.exists(exp_path):
-    os.makedirs(exp_path)
 logger = set_logger(exp_path, args.testing)
 set_random_seed(args.seed)
 device = set_torch_device(args.device)
@@ -32,7 +30,7 @@ if args.read_model_path:
 else:
     params = args
 # set up the grammar, transition system, evaluator, etc.
-Example.configuration(ptm=params.ptm, method=params.model, add_cls=params.add_cls, position='qtc')#params.position)
+Example.configuration(ptm=params.ptm, method=params.model)
 train_dataset, dev_dataset = Example.load_dataset('train'), Example.load_dataset('dev')
 logger.info("Load dataset and database finished, cost %.4fs ..." % (time.time() - start_time))
 logger.info("Dataset size: train -> %d ; dev -> %d" % (len(train_dataset), len(dev_dataset)))
@@ -41,13 +39,13 @@ args.word_vocab, args.relation_num = len(Example.word_vocab), len(Example.relati
 
 # model init, set optimizer
 if args.read_model_path:
-    model = Registrable.by_name('hetgnn-sql')(params, sql_trans).to(device)
+    model = Registrable.by_name('text2sql')(params, sql_trans).to(device)
     check_point = torch.load(open(os.path.join(args.read_model_path, 'model.bin'), 'rb'))
     model.load_state_dict(check_point['model'])
     logger.info("Load saved model from path: %s" % (args.read_model_path))
 else:
     json.dump(vars(args), open(os.path.join(exp_path, 'params.json'), 'w'), indent=4)
-    model = Registrable.by_name('hetgnn-sql')(args, sql_trans).to(device)
+    model = Registrable.by_name('text2sql')(args, sql_trans).to(device)
     if args.ptm is None:
         ratio = Example.word2vec.load_embeddings(model.encoder.input_layer.word_embed, Example.word_vocab, device=device)
         logger.info("Init model and word embedding layer with a coverage %.2f" % (ratio))
@@ -63,8 +61,8 @@ def decode(choice, output_path, acc_type='sql'):
             current_batch = Batch.from_example_list(dataset[i: i + args.batch_size], device, train=False, method='hetgnn')
             hyps = model.parse(current_batch, args.beam_size)
             all_hyps.extend(hyps)
-        # acc = evaluator.acc(all_hyps, dataset, output_path, acc_type=acc_type, etype='match')
-        acc = evaluator.error_analysis(all_hyps, dataset, output_path, etype='match')
+        acc = evaluator.acc(all_hyps, dataset, output_path, acc_type=acc_type, etype='match')
+        # acc = evaluator.error_analysis(all_hyps, dataset, output_path, etype='match')
     torch.cuda.empty_cache()
     gc.collect()
     return acc
@@ -74,12 +72,14 @@ if not args.testing:
     num_warmup_steps = int(num_training_steps * args.warmup_ratio)
     logger.info('Total training steps: %d;\t Warmup steps: %d' % (num_training_steps, num_warmup_steps))
     optimizer, scheduler = set_optimizer(model, args, num_warmup_steps, num_training_steps)
+    start_epoch, nsamples, best_result = 0, len(train_dataset), {'dev_acc': 0.}
+    train_index, step_size = np.arange(nsamples), args.batch_size // args.grad_accumulate
     if args.read_model_path and args.load_optimizer:
         optimizer.load_state_dict(check_point['optim'])
-    nsamples, best_result = len(train_dataset), {'dev_acc': 0.}
-    train_index, step_size = np.arange(nsamples), args.batch_size // args.grad_accumulate
+        scheduler.load_state_dict(check_point['scheduler'])
+        start_epoch = check_point['epoch'] + 1
     logger.info('Start training ......')
-    for i in range(args.max_epoch):
+    for i in range(start_epoch, args.max_epoch):
         start_time = time.time()
         epoch_loss, epoch_gp_loss, count = 0, 0, 0
         np.random.shuffle(train_index)
@@ -87,7 +87,7 @@ if not args.testing:
         for j in range(0, nsamples, step_size):
             count += 1
             cur_dataset = [train_dataset[k] for k in train_index[j: j + step_size]]
-            current_batch = Batch.from_example_list(cur_dataset, device, train=True, method='hetgnn', smoothing=args.smoothing)
+            current_batch = Batch.from_example_list(cur_dataset, device, train=True, method='text2sql', smoothing=args.smoothing)
             loss, gp_loss = model(current_batch) # see utils/batch.py for batch elements
             epoch_loss += loss.item()
             epoch_gp_loss += gp_loss.item()
@@ -120,7 +120,6 @@ if not args.testing:
             logger.info('NEW BEST MODEL: \tEpoch: %d\tDev acc: %.4f' % (i, dev_acc))
 
     logger.info('FINAL BEST RESULT: \tEpoch: %d\tDev acc: %.4f' % (best_result['iter'], best_result['dev_acc']))
-
     # check_point = torch.load(open(os.path.join(exp_path, 'model.bin'), 'rb'))
     # model.load_state_dict(check_point['model'])
     # train_acc = decode('train', os.path.join(exp_path, 'train.iter' + str(best_result['iter'])), acc_type='sql')

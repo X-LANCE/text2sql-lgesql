@@ -7,7 +7,7 @@ from transformers import AutoModel, AutoConfig
 
 class GraphInputLayer(nn.Module):
 
-    def __init__(self, embed_size, hidden_size, word_vocab, dropout=0.2, fix_grad_idx=60, schema_aggregation='head+tail', add_cls=True):
+    def __init__(self, embed_size, hidden_size, word_vocab, dropout=0.2, fix_grad_idx=60, schema_aggregation='head+tail'):
         super(GraphInputLayer, self).__init__()
         self.embed_size = embed_size
         self.hidden_size = hidden_size
@@ -15,7 +15,7 @@ class GraphInputLayer(nn.Module):
         self.fix_grad_idx = fix_grad_idx
         self.word_embed = nn.Embedding(self.word_vocab, self.embed_size, padding_idx=0)
         self.dropout_layer = nn.Dropout(p=dropout)
-        self.rnn_layer = InputRNNLayer(self.embed_size, self.hidden_size, cell='lstm', schema_aggregation=schema_aggregation, share_lstm=add_cls)
+        self.rnn_layer = InputRNNLayer(self.embed_size, self.hidden_size, cell='lstm', schema_aggregation=schema_aggregation)
 
     def pad_embedding_grad_zero(self, index=None):
         self.word_embed.weight.grad[0].zero_() # padding symbol is always 0
@@ -45,14 +45,14 @@ class GraphInputLayer(nn.Module):
 class GraphInputLayerPTM(nn.Module):
 
     def __init__(self, ptm='bert-base-uncased', hidden_size=256, dropout=0., subword_aggregation='mean',
-            schema_aggregation='head+tail', add_cls=True, lazy_load=False):
+            schema_aggregation='head+tail', lazy_load=False):
         super(GraphInputLayerPTM, self).__init__()
         self.ptm_model = AutoModel.from_config(AutoConfig.from_pretrained(os.path.join('./pretrained_models', ptm))) \
             if lazy_load else AutoModel.from_pretrained(os.path.join('./pretrained_models', ptm))
         self.config = self.ptm_model.config
         self.subword_aggregation = SubwordAggregation(self.config.hidden_size, subword_aggregation=subword_aggregation)
         self.dropout_layer = nn.Dropout(p=dropout)
-        self.rnn_layer = InputRNNLayer(self.config.hidden_size, hidden_size, cell='lstm', schema_aggregation=schema_aggregation, share_lstm=add_cls)
+        self.rnn_layer = InputRNNLayer(self.config.hidden_size, hidden_size, cell='lstm', schema_aggregation=schema_aggregation)
 
     def pad_embedding_grad_zero(self, index=None):
         pass
@@ -85,22 +85,16 @@ class SubwordAggregation(nn.Module):
         old_questions, old_tables, old_columns = inputs.masked_select(batch.question_mask_ptm.unsqueeze(-1)), \
             inputs.masked_select(batch.table_mask_ptm.unsqueeze(-1)), inputs.masked_select(batch.column_mask_ptm.unsqueeze(-1))
         questions = old_questions.new_zeros(batch.question_subword_lens.size(0), batch.max_question_subword_len, self.hidden_size)
-        # assert old_questions.numel() == batch.question_subword_mask.int().sum() * self.hidden_size
         questions = questions.masked_scatter_(batch.question_subword_mask.unsqueeze(-1), old_questions)
         tables = old_tables.new_zeros(batch.table_subword_lens.size(0), batch.max_table_subword_len, self.hidden_size)
-        # assert old_tables.numel() == batch.table_subword_mask.int().sum() * self.hidden_size
         tables = tables.masked_scatter_(batch.table_subword_mask.unsqueeze(-1), old_tables)
         columns = old_columns.new_zeros(batch.column_subword_lens.size(0), batch.max_column_subword_len, self.hidden_size)
-        # assert old_columns.numel() == batch.column_subword_mask.int().sum() * self.hidden_size
         columns = columns.masked_scatter_(batch.column_subword_mask.unsqueeze(-1), old_columns)
 
         questions = self.aggregation(questions, mask=batch.question_subword_mask)
         tables = self.aggregation(tables, mask=batch.table_subword_mask)
         columns = self.aggregation(columns, mask=batch.column_subword_mask)
 
-        # assert questions.numel() == batch.question_mask.int().sum() * self.hidden_size
-        # assert tables.numel() == batch.table_word_mask.int().sum() * self.hidden_size
-        # assert columns.numel() == batch.column_word_mask.int().sum() * self.hidden_size
         new_questions, new_tables, new_columns = questions.new_zeros(len(batch), batch.max_question_len, self.hidden_size),\
             tables.new_zeros(batch.table_word_mask.size(0), batch.max_table_word_len, self.hidden_size), \
                 columns.new_zeros(batch.column_word_mask.size(0), batch.max_column_word_len, self.hidden_size)
@@ -110,7 +104,7 @@ class SubwordAggregation(nn.Module):
         return new_questions, new_tables, new_columns
 
 class InputRNNLayer(nn.Module):
-    def __init__(self, input_size, hidden_size, cell='lstm', schema_aggregation='head+tail', share_lstm=True):
+    def __init__(self, input_size, hidden_size, cell='lstm', schema_aggregation='head+tail', share_lstm=False):
         super(InputRNNLayer, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size

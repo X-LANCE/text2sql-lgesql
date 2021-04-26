@@ -33,13 +33,10 @@ def add_argument_base(arg_parser):
 
 def add_argument_encoder(arg_parser):
     # Encoder Hyperparams
-    arg_parser.add_argument('--model', choices=['rat', 'lgnn', 'lgnn_plus_rat', 'lgnn_concat_rat'], default='lgnn', help='which heterogeneous gnn model to use')
+    arg_parser.add_argument('--model', choices=['rgatsql', 'lgnn', 'lgnn_plus_rat', 'lgnn_concat_rat'], default='lgnn', help='which heterogeneous gnn model to use')
     arg_parser.add_argument('--output_model', choices=['without_pruning', 'with_pruning'], default='without_pruning', help='whether add graph pruning')
-    arg_parser.add_argument('--prune_type', choices=['node', 'edge', 'both'], help='graph pruning for node/edge/both')
     arg_parser.add_argument('--ptm', type=str, choices=['bert-base-uncased', 'bert-large-uncased', 'bert-large-uncased-whole-word-masking',
         'roberta-base', 'roberta-large', 'grappa_large_jnt', 'electra-base-discriminator', 'electra-large-discriminator'], help='pretrained model name')
-    arg_parser.add_argument('--add_cls', action='store_true', help='whether add [CLS] node')
-    arg_parser.add_argument('--position', choices=['qtc', 'cluster'], default='qtc', help='whether add [CLS] node')
     arg_parser.add_argument('--subword_aggregation', choices=['mean-pooling', 'max-pooling', 'attentive-pooling'], default='attentive-pooling', help='aggregate subword feats from PTM')
     arg_parser.add_argument('--schema_aggregation', choices=['mean-pooling', 'max-pooling', 'attentive-pooling', 'head+tail'], default='head+tail', help='aggregate schema words feats')
     arg_parser.add_argument('--dropout', type=float, default=0.2, help='feature dropout rate')
@@ -52,9 +49,6 @@ def add_argument_encoder(arg_parser):
     arg_parser.add_argument('--relation_share_heads', action='store_true')
     arg_parser.add_argument('--score_function', choices=['affine', 'bilinear', 'biaffine', 'dot'], default='affine', help='graph pruning score function')
     arg_parser.add_argument('--smoothing', type=float, default=0.15, help='label smoothing factor for graph pruning')
-    # arg_parser.add_argument('--q', choices=['src', 'dst', 'none'], type=str)
-    # arg_parser.add_argument('--k', choices=['src', 'none'], type=str)
-    # arg_parser.add_argument('--v', choices=['src', 'dst', 'none'], type=str)
     return arg_parser
 
 def add_argument_decoder(arg_parser):
