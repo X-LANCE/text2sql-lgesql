@@ -123,7 +123,7 @@ class Example():
         self.tgt_action = ex['actions']
         self.used_tables, self.used_columns = ex['used_tables'], ex['used_columns']
 
-def shuffle_position_ids(ex):
+def get_position_ids(ex, shuffle=True):
     # cluster columns with their corresponding table and randomly shuffle tables and columns
     # [CLS] q1 q2 ... [SEP] * t1 c1 c2 c3 t2 c4 c5 ... [SEP]
     db, table_word_len, column_word_len = ex.db, ex.table_word_len, ex.column_word_len
@@ -134,12 +134,14 @@ def shuffle_position_ids(ex):
     column_position_id[0] = list(range(start, start + column_word_len[0]))
     start += column_word_len[0] # special symbol * first
     table_idxs = list(range(table_num))
-    random.shuffle(table_idxs)
+    if shuffle:
+        random.shuffle(table_idxs)
     for idx in table_idxs:
         col_idxs = db['table2columns'][idx]
         table_position_id[idx] = list(range(start, start + table_word_len[idx]))
         start += table_word_len[idx]
-        random.shuffle(col_idxs)
+        if shuffle:
+            random.shuffle(col_idxs)
         for col_id in col_idxs:
             column_position_id[col_id] = list(range(start, start + column_word_len[col_id]))
             start += column_word_len[col_id]
