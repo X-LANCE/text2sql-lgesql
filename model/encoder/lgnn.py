@@ -28,8 +28,8 @@ class LGNN(nn.Module):
             for _ in range(self.num_layers)])
 
     def forward(self, x, batch):
-        lg_x = self.relation_embed(batch.graph.edge_feat)
-        src_ids, dst_ids = batch.graph.g.edges(order='eid')
+        local_lgx = self.relation_embed(batch.graph.edge_feat)
+        src_ids, dst_ids = batch.graph.local_g.edges(order='eid')
         for i in range(self.num_layers):
             x, lg_x = self.gnn_layers[i](x, lg_x, batch.graph.g, batch.graph.lg, src_ids.long(), dst_ids.long())
         return x, lg_x
@@ -57,18 +57,6 @@ class LGNNLayer(nn.Module):
         src_x = torch.index_select(x, dim=0, index=src_ids)
         dst_x = torch.index_select(x, dim=0, index=dst_ids)
         out_lg_x, _ = self.edge_update(lg_x, src_x, dst_x, lg)
-
-        # node update first
-        # out_x, _ = self.node_update(x, lg_x, g)
-        # src_x = torch.index_select(out_x, dim=0, index=src_ids)
-        # dst_x = torch.index_select(out_x, dim=0, index=dst_ids)
-        # out_lg_x, _ = self.edge_update(lg_x, src_x, dst_x, lg)
-
-        # edge update first
-        # src_x = torch.index_select(x, dim=0, index=src_ids)
-        # dst_x = torch.index_select(x, dim=0, index=dst_ids)
-        # out_lg_x, _ = self.edge_update(lg_x, src_x, dst_x lg)
-        # out_x, _ = self.node_update(x, out_lg_x, g)
         return out_x, out_lg_x
 
 class EdgeUpdateLayerNodeAffine(nn.Module):

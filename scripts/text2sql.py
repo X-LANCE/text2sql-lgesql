@@ -58,7 +58,7 @@ def decode(choice, output_path, acc_type='sql'):
     all_hyps = []
     with torch.no_grad():
         for i in range(0, len(dataset), args.batch_size):
-            current_batch = Batch.from_example_list(dataset[i: i + args.batch_size], device, train=False, method='text2sql')
+            current_batch = Batch.from_example_list(dataset[i: i + args.batch_size], device, train=False)
             hyps = model.parse(current_batch, args.beam_size)
             all_hyps.extend(hyps)
         acc = evaluator.acc(all_hyps, dataset, output_path, acc_type=acc_type, etype='match')
@@ -87,7 +87,7 @@ if not args.testing:
         for j in range(0, nsamples, step_size):
             count += 1
             cur_dataset = [train_dataset[k] for k in train_index[j: j + step_size]]
-            current_batch = Batch.from_example_list(cur_dataset, device, train=True, method='text2sql', smoothing=args.smoothing)
+            current_batch = Batch.from_example_list(cur_dataset, device, train=True, smoothing=args.smoothing)
             loss, gp_loss = model(current_batch) # see utils/batch.py for batch elements
             epoch_loss += loss.item()
             epoch_gp_loss += gp_loss.item()

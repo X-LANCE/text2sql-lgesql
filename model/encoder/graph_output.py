@@ -5,8 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl.function as fn
 from model.model_utils import Registrable
-from model.encoder.rgatsql import scaled_exp, div_by_z
-# from model.encoder.lgnn import src_dot_dst
+from model.encoder.functions import scaled_exp, div_by_z, src_dot_dst
 
 class ScoreFunction(nn.Module):
 
@@ -137,10 +136,3 @@ class DGLMHA(nn.Module):
         g.update_all(fn.copy_edge('score', 'score'), fn.sum('score', 'z'), div_by_z('wv', 'z', 'o'))
         out_x = g.nodes['schema'].data['o']
         return out_x
-
-
-def src_dot_dst(src_field, dst_field, out_field):
-    def func(edges):
-        return {out_field: (edges.src[src_field] * edges.dst[dst_field]).sum(-1, keepdim=True)}
-
-    return func

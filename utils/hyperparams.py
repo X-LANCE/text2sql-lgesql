@@ -12,8 +12,8 @@ def hyperparam_path(args):
     return exp_path
 
 def hyperparam_path_text2sql(args):
-    task = '%s__model_%s' % (args.task, args.model) if 'without' in args.output_model else \
-        '%s__model_%s_gp_%s' % (args.task, args.model, args.smoothing)
+    task = 'task_%s__model_%s_view_%s' % (args.task, args.model, args.local_and_nonlocal)
+    task += '' if 'without' in args.output_model else '_gp_%s' % (args.smoothing)
     # encoder params
     exp_path = 'emb_%s' % (args.embed_size) if args.ptm is None else 'ptm_%s' % (args.ptm)
     exp_path += '__gnn_%s_x_%s' % (args.gnn_hidden_size, args.gnn_num_layers)

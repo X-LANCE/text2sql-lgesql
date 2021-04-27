@@ -2,10 +2,8 @@
 import torch
 import torch.nn as nn
 from model.encoder.graph_input import *
-# from model.encoder.lgnn import LGNN
 from model.encoder.rgatsql import RGATSQL
-# from model.encoder.lgnn_plus_rat import LGNNPlusRAT
-# from model.encoder.lgnn_concat_rat import LGNNConcatRAT
+from model.encoder.lgesql import LGESQL
 from model.encoder.graph_output import *
 from model.model_utils import Registrable
 
@@ -23,5 +21,5 @@ class Text2SQLEncoder(nn.Module):
 
     def forward(self, batch):
         outputs = self.input_layer(batch)
-        outputs, lg_outputs = self.hidden_layer(outputs, batch)
+        outputs = self.hidden_layer(outputs, batch)
         return self.output_layer(outputs, batch)

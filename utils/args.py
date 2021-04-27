@@ -8,6 +8,10 @@ def init_args(params=sys.argv[1:]):
     arg_parser = add_argument_encoder(arg_parser)
     arg_parser = add_argument_decoder(arg_parser)
     opt = arg_parser.parse_args(params)
+    if opt.model == 'rgatsql' and opt.local_and_nonlocal == 'msde':
+        opt.local_and_nonlocal = 'mmc'
+    if opt.model == 'lgesql' and opt.local_and_nonlocal == 'global':
+        opt.local_and_nonlocal = 'local'
     return opt
 
 def add_argument_base(arg_parser):
@@ -33,7 +37,9 @@ def add_argument_base(arg_parser):
 
 def add_argument_encoder(arg_parser):
     # Encoder Hyperparams
-    arg_parser.add_argument('--model', choices=['rgatsql', 'lgnn', 'lgnn_plus_rat', 'lgnn_concat_rat'], default='lgnn', help='which heterogeneous gnn model to use')
+    arg_parser.add_argument('--model', choices=['rgatsql', 'lgesql'], default='lgesql', help='which text2sql model to use')
+    arg_parser.add_argument('--local_and_nonlocal', choices=['mmc', 'msde', 'local', 'global'], default='mmc', 
+        help='how to integrate local and non-local relations: mmc -> multi-head multi-view concatenation ; msde -> mixed static and dynamic embeddings')
     arg_parser.add_argument('--output_model', choices=['without_pruning', 'with_pruning'], default='without_pruning', help='whether add graph pruning')
     arg_parser.add_argument('--ptm', type=str, choices=['bert-base-uncased', 'bert-large-uncased', 'bert-large-uncased-whole-word-masking',
         'roberta-base', 'roberta-large', 'grappa_large_jnt', 'electra-base-discriminator', 'electra-large-discriminator'], help='pretrained model name')

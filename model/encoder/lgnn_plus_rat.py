@@ -53,18 +53,4 @@ class LGNNPlusRATLayer(nn.Module):
         dst_x = torch.index_select(x, dim=0, index=dst_ids)
         out_lg_x_local, _ = self.edge_update(lg_x_local, src_x, dst_x, lg)
         out_lg_x = lg_x.masked_scatter_(local_index.unsqueeze(-1), out_lg_x_local)
-
-        # node update first
-        # out_x, _ = self.node_update(x, lg_x, g)
-        # src_x = torch.index_select(out_x, dim=0, index=src_ids)
-        # dst_x = torch.index_select(out_x, dim=0, index=dst_ids)
-        # out_lg_x_local, _ = self.edge_update(lg_x_local, src_x, dst_x, lg)
-        # out_lg_x = lg_x.masked_scatter_(local_index.unsqueeze(-1), out_lg_x_local)
-
-        # edge update first
-        # src_x = torch.index_select(x, dim=0, index=src_ids)
-        # dst_x = torch.index_select(x, dim=0, index=dst_ids)
-        # out_lg_x_local, _ = self.edge_update(lg_x_local, src_x, dst_x, lg)
-        # out_lg_x = lg_x.masked_scatter_(local_index.unsqueeze(-1), out_lg_x_local)
-        # out_x, _ = self.node_update(x, out_lg_x, g)
         return out_x, out_lg_x, out_lg_x_local
