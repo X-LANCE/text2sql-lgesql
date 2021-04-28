@@ -29,10 +29,10 @@ class RGATSQL(nn.Module):
     def forward(self, x, batch):
         if self.graph_view == 'multiview':
             # multi-view multi-head concatenation
-            if self.relation_share_layers:
-                local_edges, global_edges = batch.graph.local_edges, batch.graph.global_edges
-                local_lgx, global_lgx = self.relation_embed(local_edges), self.relation_embed(global_edges)
+            local_edges, global_edges = batch.graph.local_edges, batch.graph.global_edges
             local_g, global_g = batch.graph.local_g, batch.graph.global_g
+            if self.relation_share_layers:
+                local_lgx, global_lgx = self.relation_embed(local_edges), self.relation_embed(global_edges)
             for i in range(self.num_layers):
                 local_lgx = self.relation_embed[i](local_edges) if not self.relation_share_layers else local_lgx
                 global_lgx = self.relation_embed[i](global_edges) if not self.relation_share_layers else global_lgx
