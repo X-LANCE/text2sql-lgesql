@@ -38,15 +38,14 @@ sql_trans, evaluator = Example.trans, Example.evaluator
 args.word_vocab, args.relation_num = len(Example.word_vocab), len(Example.relation_vocab)
 
 # model init, set optimizer
+model = Registrable.by_name('text2sql')(params, sql_trans).to(device)
 if args.read_model_path:
-    model = Registrable.by_name('text2sql')(params, sql_trans).to(device)
     check_point = torch.load(open(os.path.join(args.read_model_path, 'model.bin'), 'rb'))
     model.load_state_dict(check_point['model'])
     logger.info("Load saved model from path: %s" % (args.read_model_path))
 else:
-    json.dump(vars(args), open(os.path.join(exp_path, 'params.json'), 'w'), indent=4)
-    model = Registrable.by_name('text2sql')(args, sql_trans).to(device)
-    if args.ptm is None:
+    json.dump(vars(params), open(os.path.join(exp_path, 'params.json'), 'w'), indent=4)
+    if params.ptm is None:
         ratio = Example.word2vec.load_embeddings(model.encoder.input_layer.word_embed, Example.word_vocab, device=device)
         logger.info("Init model and word embedding layer with a coverage %.2f" % (ratio))
 # logger.info(str(model))
