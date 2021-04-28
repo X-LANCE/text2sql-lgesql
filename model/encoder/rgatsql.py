@@ -22,7 +22,7 @@ class RGATSQL(nn.Module):
             self.relation_embed = nn.Embedding(args.relation_num, edim)
         else:
             self.relation_embed = nn.ModuleList([nn.Embedding(args.relation_num, edim) for _ in range(self.num_layers)])
-        gnn_layer = MultiViewRGATLayer if self.graph_view else RGATLayer
+        gnn_layer = MultiViewRGATLayer if self.graph_view == 'multiview' else RGATLayer
         self.gnn_layers = nn.ModuleList([gnn_layer(args.gnn_hidden_size, edim, num_heads=args.num_heads, feat_drop=args.dropout)
             for _ in range(self.num_layers)])
 
@@ -36,7 +36,7 @@ class RGATSQL(nn.Module):
             for i in range(self.num_layers):
                 local_lgx = self.relation_embed[i](local_edges) if not self.relation_share_layers else local_lgx
                 global_lgx = self.relation_embed[i](global_edges) if not self.relation_share_layers else global_lgx
-                x, local_lgx, global_lgx = self.gnn_layers[i](x, local_lgx, global_lgx, local_g, global_g)
+                x, (local_lgx, global_lgx) = self.gnn_layers[i](x, local_lgx, global_lgx, local_g, global_g)
         else:
             edges = batch.graph.local_edges if self.graph_view == 'local' else batch.graph.global_edges
             graph = batch.graph.local_g if self.graph_view == 'local' else batch.graph.global_g
@@ -120,4 +120,4 @@ class MultiViewRGATLayer(RGATLayer):
         out_x = torch.cat([out_x1, out_x2], dim=1)
         out_x = self.layernorm(x + self.affine_o(out_x.view(-1, self.num_heads * self.d_k)))
         out_x = self.ffn(out_x)
-        return out_x, local_lgx, global_lgx
+        return out_x, (local_lgx, global_lgx)

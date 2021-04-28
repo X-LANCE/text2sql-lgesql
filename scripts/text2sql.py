@@ -104,7 +104,7 @@ if not args.testing:
         torch.cuda.empty_cache()
         gc.collect()
 
-        if i <= args.eval_after_epoch: # avoid unnecessary evaluation
+        if i < args.eval_after_epoch: # avoid unnecessary evaluation
             continue
 
         start_time = time.time()
@@ -131,6 +131,6 @@ else:
     # logger.info("Evaluation costs %.2fs ; Train dataset exact match acc is %.4f ." % (time.time() - start_time, train_acc))
     start_time = time.time()
     dev_acc = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval'), acc_type='sql')
-    logger.info("Evaluation costs %.2fs ; Dev dataset exact match acc is %.4f ." % (time.time() - start_time, dev_acc))
-    # dev_acc_beam = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval.beam' + str(args.beam_size)), acc_type='beam')
-    # logger.info("Evaluation costs %.2fs ; Dev dataset exact match/inner beam acc is %.4f/%.4f ." % (time.time() - start_time, dev_acc, dev_acc_beam))
+    # logger.info("Evaluation costs %.2fs ; Dev dataset exact match acc is %.4f ." % (time.time() - start_time, dev_acc))
+    dev_acc_beam = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval.beam' + str(args.beam_size)), acc_type='beam')
+    logger.info("Evaluation costs %.2fs ; Dev dataset exact match/inner beam acc is %.4f/%.4f ." % (time.time() - start_time, dev_acc, dev_acc_beam))

@@ -2,7 +2,8 @@
 import copy, math
 import torch, dgl
 import torch.nn as nn
-from model.model_utils import Registrable
+import dgl.function as fn
+from model.model_utils import Registrable, FFN
 from model.encoder.rgatsql import RGATLayer, MultiViewRGATLayer
 from model.encoder.functions import *
 

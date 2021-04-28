@@ -29,7 +29,7 @@ class GraphFactory():
         global_edges = ex['graph'].global_edges
         rel_ids = list(map(lambda r: self.relation_vocab[r[2]], global_edges))
         graph.global_edges = torch.tensor(rel_ids, dtype=torch.long)
-        graph.local_g, global_g = ex['graph'].local_g, ex['graph'].global_g
+        graph.local_g, graph.global_g = ex['graph'].local_g, ex['graph'].global_g
         graph.gp = ex['graph'].gp
         graph.question_mask = torch.tensor(ex['graph'].question_mask, dtype=torch.bool)
         graph.schema_mask = torch.tensor(ex['graph'].schema_mask, dtype=torch.bool)

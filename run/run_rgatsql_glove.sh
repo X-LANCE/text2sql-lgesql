@@ -35,7 +35,7 @@ no_parent_field_type_embed=''
 no_parent_state=''
 
 batch_size=20
-grad_accumulate=5
+grad_accumulate=2
 lr=5e-4
 l2=1e-4
 smooth=0.15
