@@ -1,4 +1,4 @@
-task=lgesql
+task=lgesql_large
 seed=999
 device=0
 testing='' #'--testing'
@@ -6,8 +6,8 @@ read_model_path=''
 
 model=lgesql
 output_model=with_pruning # without_pruning
-local_and_nonlocal=mmc # mmc, msde, local
-ptm="--ptm bert-base-uncased"
+local_and_nonlocal=$1 # mmc, msde, local
+ptm=$2
 subword_aggregation=attentive-pooling
 schema_aggregation=head+tail
 gnn_hidden_size=512
@@ -36,14 +36,14 @@ no_parent_state=''
 
 batch_size=20
 grad_accumulate=10
-lr=2e-4
+lr=1e-4
 layerwise_decay=0.8
 l2=0.1
 smoothing=0.15
 warmup_ratio=0.1
 lr_schedule=linear
-eval_after_epoch=60
-max_epoch=100
+eval_after_epoch=120
+max_epoch=200
 max_norm=5
 beam_size=5
 
