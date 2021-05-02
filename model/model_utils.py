@@ -165,7 +165,7 @@ class FFN(nn.Module):
         self.input_size = input_size
         self.feedforward = nn.Sequential(
             nn.Linear(self.input_size, self.input_size * 4),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
             nn.Linear(self.input_size * 4, self.input_size)
         )
         self.layernorm = nn.LayerNorm(self.input_size)

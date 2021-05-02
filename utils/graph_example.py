@@ -34,57 +34,35 @@ class GraphFactory():
         graph.question_mask = torch.tensor(ex['graph'].question_mask, dtype=torch.bool)
         graph.schema_mask = torch.tensor(ex['graph'].schema_mask, dtype=torch.bool)
         graph.node_label = torch.tensor(ex['graph'].node_label, dtype=torch.float)
+        # extract local relations (used in msde), global_edges = local_edges + nonlocal_edges
+        local_enum, global_enum = graph.local_edges.size(0), graph.global_edges.size(0)
+        graph.local_mask = torch.tensor([1] * local_enum + [0] * (global_enum - local_enum), dtype=torch.bool)
         return graph
 
     def lgesql(self, ex, db):
         graph = self.rgatsql(ex, db)
         # add line graph
         graph.lg = ex['graph'].lg
-        # extract local relations (used in msde), global_edges = local_edges + nonlocal_edges
-        local_enum, global_enum = graph.local_edges.size(0), graph.global_edges.size(0)
-        graph.local_mask = torch.tensor([1] * local_enum + [0] * (global_enum - local_enum), dtype=torch.bool)
         return graph
 
     def batch_graphs(self, ex_list, device, train=True, **kwargs):
         """ Batch graphs in example list """
         return self.batch_method(ex_list, device, train=train, **kwargs)
 
-    def batch_lgnn_plus_rat(self, ex_list, device, train=True, **kwargs):
-        bg = self.batch_lgnn(ex_list, device, train=train, **kwargs)
-        src_ids, dst_ids = bg.g.edges(order='eid')
-        bg.src_ids, bg.dst_ids = src_ids.long(), dst_ids.long()
-        bg.g = dgl.batch([ex.graph.full_g for ex in ex_list]).to(device)
-        bg.edge_feat = torch.cat([ex.graph.full_edge_feat for ex in ex_list], dim=0).to(device)
-        bg.local_index = torch.cat([ex.graph.local_index for ex in ex_list], dim=0).to(device)
-        return bg
-
-    def batch_lgnn_concat_rat(self, ex_list, device, train=True, **kwargs):
-        bg = self.batch_lgnn(ex_list, device, train=train, **kwargs)
-        bg.full_g = dgl.batch([ex.graph.full_g for ex in ex_list]).to(device)
-        bg.full_edge_feat = torch.cat([ex.graph.full_edge_feat for ex in ex_list], dim=0).to(device)
-        return bg
-
     def batch_lgesql(self, ex_list, device, train=True, **kwargs):
         bg = self.batch_rgatsql(ex_list, device, train=train, **kwargs)
         src_ids, dst_ids = bg.local_g.edges(order='eid')
         bg.src_ids, bg.dst_ids = src_ids.long(), dst_ids.long()
         bg.lg = dgl.batch([ex.graph.lg for ex in ex_list]).to(device)
-        bg.local_mask = torch.cat([ex.graph.local_mask for ex in ex_list], dim=0).to(device)
         return bg
 
     def batch_rgatsql(self, ex_list, device, train=True, **kwargs):
         # method = kwargs.pop('local_and_nonlocal', 'global')
         graph_list = [ex.graph for ex in ex_list]
         bg = BatchedGraph()
-        # if method == 'global':
-            # bg.global_g = dgl.batch([ex.global_g for ex in graph_list]).to(device)
-            # bg.global_edges = torch.cat([ex.global_edges for ex in graph_list], dim=0).to(device)
-        # elif method == 'local':
-            # bg.local_g = dgl.batch([ex.local_g for ex in graph_list]).to(device)
-            # bg.local_edges = torch.cat([ex.local_edges for ex in graph_list], dim=0).to(device)
-        # else: # multi-head multi-view concatenation
         bg.local_g = dgl.batch([ex.local_g for ex in graph_list]).to(device)
-        bg.local_edges = torch.cat([ex.local_edges for ex in graph_list], dim=0).to(device)
+        # bg.local_edges = torch.cat([ex.local_edges for ex in graph_list], dim=0).to(device)
+        bg.local_mask = torch.cat([ex.graph.local_mask for ex in ex_list], dim=0).to(device)
         bg.global_g = dgl.batch([ex.global_g for ex in graph_list]).to(device)
         bg.global_edges = torch.cat([ex.global_edges for ex in graph_list], dim=0).to(device)
         if train:

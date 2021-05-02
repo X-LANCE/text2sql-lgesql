@@ -29,21 +29,23 @@ class RGATSQL(nn.Module):
     def forward(self, x, batch):
         if self.graph_view == 'multiview':
             # multi-view multi-head concatenation
-            local_edges, global_edges = batch.graph.local_edges, batch.graph.global_edges
+            global_edges, mask = batch.graph.global_edges, batch.graph.local_mask
             local_g, global_g = batch.graph.local_g, batch.graph.global_g
             if self.relation_share_layers:
-                local_lgx, global_lgx = self.relation_embed(local_edges), self.relation_embed(global_edges)
+                global_lgx = self.relation_embed(global_edges)
+                local_lgx = global_lgx[mask]
             for i in range(self.num_layers):
-                local_lgx = self.relation_embed[i](local_edges) if not self.relation_share_layers else local_lgx
                 global_lgx = self.relation_embed[i](global_edges) if not self.relation_share_layers else global_lgx
+                local_lgx = global_lgx[mask] if not self.relation_share_layers else local_lgx
                 x, (local_lgx, global_lgx) = self.gnn_layers[i](x, local_lgx, global_lgx, local_g, global_g)
         else:
-            edges = batch.graph.local_edges if self.graph_view == 'local' else batch.graph.global_edges
             graph = batch.graph.local_g if self.graph_view == 'local' else batch.graph.global_g
+            edges, mask = batch.graph.global_edges, batch.graph.local_mask
             if self.relation_share_layers:
                 lgx = self.relation_embed(edges)
+                lgx = lgx if self.graph_view == 'global' else lgx[mask]
             for i in range(self.num_layers):
-                lgx = self.relation_embed[i](edges) if not self.relation_share_layers else lgx
+                lgx = lgx if self.relation_share_layers else self.relation_embed[i](edges) if self.graph_view == 'global' else self.relation_embed[i](edges)[mask]
                 x, lgx = self.gnn_layers[i](x, lgx, graph)
         return x
 

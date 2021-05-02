@@ -1,4 +1,4 @@
-task=lgesql_large
+task=lgesql_base
 seed=999
 device=0
 testing='' #'--testing'
@@ -12,7 +12,7 @@ subword_aggregation=attentive-pooling
 schema_aggregation=head+tail
 gnn_hidden_size=512
 gnn_num_layers=8
-relation_share_heads='--relation_share_heads'
+relation_share_heads=$3
 score_function='affine'
 num_heads=8
 dropout=0.2
@@ -42,13 +42,13 @@ l2=0.1
 smoothing=0.15
 warmup_ratio=0.1
 lr_schedule=linear
-eval_after_epoch=120
-max_epoch=200
+eval_after_epoch=100
+max_epoch=160
 max_norm=5
 beam_size=5
 
 python scripts/text2sql.py --task $task --seed $seed --device $device $testing $read_model_path \
-    $ptm --gnn_hidden_size $gnn_hidden_size --dropout $dropout --attn_drop $attn_drop --att_vec_size $att_vec_size \
+    --ptm $ptm --gnn_hidden_size $gnn_hidden_size --dropout $dropout --attn_drop $attn_drop --att_vec_size $att_vec_size \
     --model $model --output_model $output_model --local_and_nonlocal $local_and_nonlocal --score_function $score_function $relation_share_heads \
     --subword_aggregation $subword_aggregation --schema_aggregation $schema_aggregation --gnn_num_layers $gnn_num_layers --num_heads $num_heads $sep_cxt \
     --lstm $lstm --chunk_size $chunk_size --drop_connect $drop_connect --lstm_hidden_size $lstm_hidden_size --lstm_num_layers $lstm_num_layers \
