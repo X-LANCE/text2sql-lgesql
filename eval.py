@@ -42,7 +42,7 @@ args = parser.parse_args(sys.argv[1:])
 params = json.load(open(os.path.join(args.saved_model, 'params.json'), 'r'), object_hook=lambda d: Namespace(**d))
 params.lazy_load = True # load PTM from AutoConfig instead of AutoModel.from_pretrained(...)
 dataset, tables = preprocess_database_and_dataset(db_dir=args.db_dir, table_path=args.table_path, dataset_path=args.dataset_path, method=params.model)
-Example.configuration(ptm=params.ptm, method=params.model, tables=tables)
+Example.configuration(ptm=params.ptm, method=params.model, tables=tables, table_path=args.table_path)
 dataset = load_examples(dataset, tables)
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")

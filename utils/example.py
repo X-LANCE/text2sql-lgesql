@@ -4,7 +4,7 @@ import torch, random
 import numpy as np
 from asdl.asdl import ASDLGrammar
 from asdl.transition_system import TransitionSystem
-from utils.constants import BOS, UNK, GRAMMAR_FILEPATH, SCHEMA_TYPES, RELATIONS
+from utils.constants import UNK, GRAMMAR_FILEPATH, SCHEMA_TYPES, RELATIONS
 from utils.graph_example import GraphFactory
 from utils.vocab import Vocab
 from utils.word2vec import Word2vecUtils
@@ -15,17 +15,17 @@ from itertools import chain
 class Example():
 
     @classmethod
-    def configuration(cls, ptm=None, method='lgesql', table_path='data/tables.bin', tables=None):
+    def configuration(cls, ptm=None, method='lgesql', table_path='data/tables.json', tables='data/tables.bin'):
         cls.ptm, cls.method = ptm, method
         cls.grammar = ASDLGrammar.from_filepath(GRAMMAR_FILEPATH)
         cls.trans = TransitionSystem.get_class_by_lang('sql')(cls.grammar)
-        cls.tables = pickle.load(open(table_path, 'rb')) if tables is None else tables
-        cls.evaluator = Evaluator(cls.trans)
+        cls.tables = pickle.load(open(tables, 'rb')) if type(tables) == str else tables
+        cls.evaluator = Evaluator(cls.trans, table_path)
         if ptm is None:
             cls.word2vec = Word2vecUtils()
             cls.tokenizer = lambda x: x
             cls.word_vocab = Vocab(padding=True, unk=True, boundary=True, default=UNK,
-                filepath='./pretrained_models/glove-42b-300d/vocab.txt', specials=SCHEMA_TYPES) # word vocab for glove.42B.300d
+                filepath='./pretrained_models/glove.42b.300d/vocab.txt', specials=SCHEMA_TYPES) # word vocab for glove.42B.300d
         else:
             cls.tokenizer = AutoTokenizer.from_pretrained(os.path.join('./pretrained_models', ptm))
             cls.word_vocab = cls.tokenizer.get_vocab()

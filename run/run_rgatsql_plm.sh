@@ -1,4 +1,4 @@
-task=rgatsql_base
+task=rgatsql_large
 seed=999
 device=0
 testing='' #'--testing'
@@ -36,15 +36,15 @@ no_parent_field_type_embed=''
 no_parent_state=''
 
 batch_size=20
-grad_accumulate=5
-lr=2e-4
+grad_accumulate=20
+lr=1e-4
 layerwise_decay=0.8
 l2=0.1
 smooth=0.15
 warmup_ratio=0.1
 lr_schedule=linear
-eval_after_epoch=60
-max_epoch=100
+eval_after_epoch=100
+max_epoch=160
 max_norm=5
 beam_size=5
 
