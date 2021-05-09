@@ -18,8 +18,8 @@ def from_example_list_base(ex_list, device='cpu', train=True):
         columns: torch.long, sum_of_columns x max_column_word_len
     """
     batch = Batch(ex_list, device)
-    ptm = Example.ptm
-    pad_idx = Example.word_vocab[PAD] if ptm is None else Example.tokenizer.pad_token_id
+    plm = Example.plm
+    pad_idx = Example.word_vocab[PAD] if plm is None else Example.tokenizer.pad_token_id
 
     question_lens = [len(ex.question) for ex in ex_list]
     batch.question_lens = torch.tensor(question_lens, dtype=torch.long, device=device)
@@ -34,7 +34,7 @@ def from_example_list_base(ex_list, device='cpu', train=True):
     column_word_lens = [len(c) for ex in ex_list for c in ex.column]
     batch.column_word_lens = torch.tensor(column_word_lens, dtype=torch.long, device=device)
 
-    if ptm is None: # glove.42B.300d
+    if plm is None: # glove.42B.300d
         questions = [ex.question_id + [pad_idx] * (batch.max_question_len - len(ex.question_id)) for ex in ex_list]
         batch.questions = torch.tensor(questions, dtype=torch.long, device=device)
         tables = [t + [pad_idx] * (batch.max_table_word_len - len(t)) for ex in ex_list for t in ex.table_id]
@@ -54,13 +54,13 @@ def from_example_list_base(ex_list, device='cpu', train=True):
         batch.inputs["token_type_ids"] = torch.tensor(token_type_ids, dtype=torch.long, device=device)
         position_ids = [get_position_ids(ex, shuffle=train) + [0] * (max_len - len(ex.input_id)) for ex in ex_list]
         batch.inputs["position_ids"] = torch.tensor(position_ids, dtype=torch.long, device=device)
-        # extract representations after ptm, remove [SEP]
-        question_mask_ptm = [ex.question_mask_ptm + [0] * (max_len - len(ex.question_mask_ptm)) for ex in ex_list]
-        batch.question_mask_ptm = torch.tensor(question_mask_ptm, dtype=torch.bool, device=device)
-        table_mask_ptm = [ex.table_mask_ptm + [0] * (max_len - len(ex.table_mask_ptm)) for ex in ex_list]
-        batch.table_mask_ptm = torch.tensor(table_mask_ptm, dtype=torch.bool, device=device)
-        column_mask_ptm = [ex.column_mask_ptm + [0] * (max_len - len(ex.column_mask_ptm)) for ex in ex_list]
-        batch.column_mask_ptm = torch.tensor(column_mask_ptm, dtype=torch.bool, device=device)
+        # extract representations after plm, remove [SEP]
+        question_mask_plm = [ex.question_mask_plm + [0] * (max_len - len(ex.question_mask_plm)) for ex in ex_list]
+        batch.question_mask_plm = torch.tensor(question_mask_plm, dtype=torch.bool, device=device)
+        table_mask_plm = [ex.table_mask_plm + [0] * (max_len - len(ex.table_mask_plm)) for ex in ex_list]
+        batch.table_mask_plm = torch.tensor(table_mask_plm, dtype=torch.bool, device=device)
+        column_mask_plm = [ex.column_mask_plm + [0] * (max_len - len(ex.column_mask_plm)) for ex in ex_list]
+        batch.column_mask_plm = torch.tensor(column_mask_plm, dtype=torch.bool, device=device)
         # subword aggregation
         question_subword_lens = [l for ex in ex_list for l in ex.question_subword_len]
         batch.question_subword_lens = torch.tensor(question_subword_lens, dtype=torch.long, device=device)
@@ -70,7 +70,7 @@ def from_example_list_base(ex_list, device='cpu', train=True):
         batch.column_subword_lens = torch.tensor(column_subword_lens, dtype=torch.long, device=device)
 
     batch.question_unk_mask, batch.table_unk_mask, batch.column_unk_mask = None, None, None
-    if not train and ptm is None:
+    if not train and plm is None:
         # during evaluation, for words not in vocab but in glove vocab, extract its correpsonding embedding
         word2vec, unk_idx = Example.word2vec, Example.word_vocab[UNK]
 

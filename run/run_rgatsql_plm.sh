@@ -7,7 +7,7 @@ read_model_path=''
 model=rgatsql
 output_model=with_pruning # without_pruning
 local_and_nonlocal=$1 # mmc, local, global
-ptm=$2 #"--ptm bert-base-uncased"
+plm=$2 # bert-base-uncased
 subword_aggregation=attentive-pooling
 schema_aggregation=head+tail
 gnn_hidden_size=512
@@ -49,7 +49,7 @@ max_norm=5
 beam_size=5
 
 python scripts/text2sql.py --task $task --seed $seed --device $device $testing $read_model_path \
-    --ptm $ptm --gnn_hidden_size $gnn_hidden_size --dropout $dropout --attn_drop $attn_drop --att_vec_size $att_vec_size \
+    --plm $plm --gnn_hidden_size $gnn_hidden_size --dropout $dropout --attn_drop $attn_drop --att_vec_size $att_vec_size \
     --model $model --output_model $output_model --local_and_nonlocal $local_and_nonlocal --score_function $score_function $relation_share_layers $relation_share_heads \
     --subword_aggregation $subword_aggregation --schema_aggregation $schema_aggregation --gnn_num_layers $gnn_num_layers --num_heads $num_heads $sep_cxt \
     --lstm $lstm --chunk_size $chunk_size --drop_connect $drop_connect --lstm_hidden_size $lstm_hidden_size --lstm_num_layers $lstm_num_layers \

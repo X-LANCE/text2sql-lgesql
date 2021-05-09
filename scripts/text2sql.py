@@ -30,7 +30,7 @@ if args.read_model_path:
 else:
     params = args
 # set up the grammar, transition system, evaluator, etc.
-Example.configuration(ptm=params.ptm, method=params.model)
+Example.configuration(plm=params.plm, method=params.model)
 train_dataset, dev_dataset = Example.load_dataset('train'), Example.load_dataset('dev')
 logger.info("Load dataset and database finished, cost %.4fs ..." % (time.time() - start_time))
 logger.info("Dataset size: train -> %d ; dev -> %d" % (len(train_dataset), len(dev_dataset)))
@@ -45,7 +45,7 @@ if args.read_model_path:
     logger.info("Load saved model from path: %s" % (args.read_model_path))
 else:
     json.dump(vars(params), open(os.path.join(exp_path, 'params.json'), 'w'), indent=4)
-    if params.ptm is None:
+    if params.plm is None:
         ratio = Example.word2vec.load_embeddings(model.encoder.input_layer.word_embed, Example.word_vocab, device=device)
         logger.info("Init model and word embedding layer with a coverage %.2f" % (ratio))
 # logger.info(str(model))

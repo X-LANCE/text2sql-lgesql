@@ -15,19 +15,19 @@ from itertools import chain
 class Example():
 
     @classmethod
-    def configuration(cls, ptm=None, method='lgesql', table_path='data/tables.json', tables='data/tables.bin'):
-        cls.ptm, cls.method = ptm, method
+    def configuration(cls, plm=None, method='lgesql', table_path='data/tables.json', tables='data/tables.bin'):
+        cls.plm, cls.method = plm, method
         cls.grammar = ASDLGrammar.from_filepath(GRAMMAR_FILEPATH)
         cls.trans = TransitionSystem.get_class_by_lang('sql')(cls.grammar)
         cls.tables = pickle.load(open(tables, 'rb')) if type(tables) == str else tables
         cls.evaluator = Evaluator(cls.trans, table_path)
-        if ptm is None:
+        if plm is None:
             cls.word2vec = Word2vecUtils()
             cls.tokenizer = lambda x: x
             cls.word_vocab = Vocab(padding=True, unk=True, boundary=True, default=UNK,
                 filepath='./pretrained_models/glove.42b.300d/vocab.txt', specials=SCHEMA_TYPES) # word vocab for glove.42B.300d
         else:
-            cls.tokenizer = AutoTokenizer.from_pretrained(os.path.join('./pretrained_models', ptm))
+            cls.tokenizer = AutoTokenizer.from_pretrained(os.path.join('./pretrained_models', plm))
             cls.word_vocab = cls.tokenizer.get_vocab()
         cls.relation_vocab = Vocab(padding=False, unk=False, boundary=False, iterable=RELATIONS, default=None)
         cls.graph_factory = GraphFactory(cls.method, cls.relation_vocab)
@@ -59,7 +59,7 @@ class Example():
         self.db = db
 
         """ Mapping word to corresponding index """
-        if Example.ptm is None:
+        if Example.plm is None:
             self.question = ex['processed_question_toks']
             self.question_id = [Example.word_vocab[w] for w in self.question]
             self.column = [[db['column_types'][idx].lower()] + c for idx, c in enumerate(db['processed_column_toks'])]
@@ -70,17 +70,17 @@ class Example():
             t = Example.tokenizer
             self.question = [q.lower() for q in ex['raw_question_toks']]
             self.question_id = [t.cls_token_id] # map token to id
-            self.question_mask_ptm = [] # remove SEP token in our case
+            self.question_mask_plm = [] # remove SEP token in our case
             self.question_subword_len = [] # subword len for each word, exclude SEP token
             for w in self.question:
                 toks = t.convert_tokens_to_ids(t.tokenize(w))
                 self.question_id.extend(toks)
                 self.question_subword_len.append(len(toks))
-            self.question_mask_ptm = [0] + [1] * (len(self.question_id) - 1) + [0]
+            self.question_mask_plm = [0] + [1] * (len(self.question_id) - 1) + [0]
             self.question_id.append(t.sep_token_id)
 
             self.table = [['table'] + t.lower().split() for t in db['table_names']]
-            self.table_id, self.table_mask_ptm, self.table_subword_len = [], [], []
+            self.table_id, self.table_mask_plm, self.table_subword_len = [], [], []
             self.table_word_len = []
             for s in self.table:
                 l = 0
@@ -90,10 +90,10 @@ class Example():
                     self.table_subword_len.append(len(toks))
                     l += len(toks)
                 self.table_word_len.append(l)
-            self.table_mask_ptm = [1] * len(self.table_id)
+            self.table_mask_plm = [1] * len(self.table_id)
 
             self.column = [[db['column_types'][idx].lower()] + c.lower().split() for idx, (_, c) in enumerate(db['column_names'])]
-            self.column_id, self.column_mask_ptm, self.column_subword_len = [], [], []
+            self.column_id, self.column_mask_plm, self.column_subword_len = [], [], []
             self.column_word_len = []
             for s in self.column:
                 l = 0
@@ -103,17 +103,17 @@ class Example():
                     self.column_subword_len.append(len(toks))
                     l += len(toks)
                 self.column_word_len.append(l)
-            self.column_mask_ptm = [1] * len(self.column_id) + [0]
+            self.column_mask_plm = [1] * len(self.column_id) + [0]
             self.column_id.append(t.sep_token_id)
 
             self.input_id = self.question_id + self.table_id + self.column_id
             self.segment_id = [0] * len(self.question_id) + [1] * (len(self.table_id) + len(self.column_id)) \
-                if Example.ptm != 'grappa_large_jnt' and not Example.ptm.startswith('roberta') \
+                if Example.plm != 'grappa_large_jnt' and not Example.plm.startswith('roberta') \
                 else [0] * (len(self.question_id) + len(self.table_id) + len(self.column_id))
 
-            self.question_mask_ptm = self.question_mask_ptm + [0] * (len(self.table_id) + len(self.column_id))
-            self.table_mask_ptm = [0] * len(self.question_id) + self.table_mask_ptm + [0] * len(self.column_id)
-            self.column_mask_ptm = [0] * (len(self.question_id) + len(self.table_id)) + self.column_mask_ptm
+            self.question_mask_plm = self.question_mask_plm + [0] * (len(self.table_id) + len(self.column_id))
+            self.table_mask_plm = [0] * len(self.question_id) + self.table_mask_plm + [0] * len(self.column_id)
+            self.column_mask_plm = [0] * (len(self.question_id) + len(self.table_id)) + self.column_mask_plm
 
         self.graph = Example.graph_factory.graph_construction(ex, db)
 

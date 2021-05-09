@@ -14,7 +14,7 @@ class Text2SQLEncoder(nn.Module):
         super(Text2SQLEncoder, self).__init__()
         lazy_load = args.lazy_load if hasattr(args, 'lazy_load') else False
         self.input_layer = GraphInputLayer(args.embed_size, args.gnn_hidden_size, args.word_vocab, dropout=args.dropout, schema_aggregation=args.schema_aggregation) \
-            if args.ptm is None else GraphInputLayerPTM(args.ptm, args.gnn_hidden_size, dropout=args.dropout,
+            if args.plm is None else GraphInputLayerPLM(args.plm, args.gnn_hidden_size, dropout=args.dropout,
                 subword_aggregation=args.subword_aggregation, schema_aggregation=args.schema_aggregation, lazy_load=lazy_load)
         self.hidden_layer = Registrable.by_name(args.model)(args)
         self.output_layer = Registrable.by_name(args.output_model)(args)

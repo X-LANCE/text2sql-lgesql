@@ -15,7 +15,7 @@ def hyperparam_path_text2sql(args):
     task = 'task_%s__model_%s_view_%s' % (args.task, args.model, args.local_and_nonlocal)
     task += '' if 'without' in args.output_model else '_gp_%s' % (args.smoothing)
     # encoder params
-    exp_path = 'emb_%s' % (args.embed_size) if args.ptm is None else 'ptm_%s' % (args.ptm)
+    exp_path = 'emb_%s' % (args.embed_size) if args.plm is None else 'plm_%s' % (args.plm)
     exp_path += '__gnn_%s_x_%s' % (args.gnn_hidden_size, args.gnn_num_layers)
     exp_path += '__share' if args.relation_share_layers else ''
     exp_path += '__head_%s' % (args.num_heads)
@@ -36,7 +36,7 @@ def hyperparam_path_text2sql(args):
     # exp_path += '__te_%s' % ('no' if args.no_parent_field_type_embed else args.type_embed_size)
     # training params
     exp_path += '__bs_%s' % (args.batch_size)
-    exp_path += '__lr_%s' % (args.lr) if args.ptm is None else '__lr_%s_ld_%s' % (args.lr, args.layerwise_decay)
+    exp_path += '__lr_%s' % (args.lr) if args.plm is None else '__lr_%s_ld_%s' % (args.lr, args.layerwise_decay)
     exp_path += '__l2_%s' % (args.l2)
     exp_path += '__wp_%s' % (args.warmup_ratio)
     exp_path += '__sd_%s' % (args.lr_schedule)

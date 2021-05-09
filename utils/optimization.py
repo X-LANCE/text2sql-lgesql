@@ -25,28 +25,28 @@ from collections import defaultdict
 logger = logging.getLogger(__name__)
 
 def set_optimizer(model, args, num_warmup_steps, num_training_steps, last_epoch=-1):
-    ptm = hasattr(model.encoder.input_layer, 'ptm_model')
-    if ptm and args.layerwise_decay <= 0.: # fix ptm params
+    plm = hasattr(model.encoder.input_layer, 'plm_model')
+    if plm and args.layerwise_decay <= 0.: # fix plm params
         for n, p in model.named_parameters():
-            if 'ptm_model' in n:
+            if 'plm_model' in n:
                 p.requires_grad = False
     params = [(n, p) for n, p in model.named_parameters() if p.requires_grad]
     no_decay = ['bias', 'LayerNorm.weight']
-    if ptm and 0. < args.layerwise_decay <= 0.5: # seperate lr for ptm
+    if plm and 0. < args.layerwise_decay <= 0.5: # seperate lr for plm
         grouped_params = [
-            {'params': list(set([p for n, p in params if 'ptm_model' in n and not any(nd in n for nd in no_decay)])), 'lr': args.layerwise_decay * args.lr, 'weight_decay': args.l2},
-            {'params': list(set([p for n, p in params if 'ptm_model' in n and any(nd in n for nd in no_decay)])), 'lr': args.layerwise_decay * args.lr, 'weight_decay': 0.0},
-            {'params': list(set([p for n, p in params if 'ptm_model' not in n and not any(nd in n for nd in no_decay)])), 'weight_decay': args.l2},
-            {'params': list(set([p for n, p in params if 'ptm_model' not in n and any(nd in n for nd in no_decay)])), 'weight_decay': 0.0},
+            {'params': list(set([p for n, p in params if 'plm_model' in n and not any(nd in n for nd in no_decay)])), 'lr': args.layerwise_decay * args.lr, 'weight_decay': args.l2},
+            {'params': list(set([p for n, p in params if 'plm_model' in n and any(nd in n for nd in no_decay)])), 'lr': args.layerwise_decay * args.lr, 'weight_decay': 0.0},
+            {'params': list(set([p for n, p in params if 'plm_model' not in n and not any(nd in n for nd in no_decay)])), 'weight_decay': args.l2},
+            {'params': list(set([p for n, p in params if 'plm_model' not in n and any(nd in n for nd in no_decay)])), 'weight_decay': 0.0},
         ]
         print('Use seperate lr %f for pretrained model ...' % (args.lr * args.layerwise_decay))
-    elif ptm and 0.5 < args.layerwise_decay < 1.: # lr decay layerwise for ptm
+    elif plm and 0.5 < args.layerwise_decay < 1.: # lr decay layerwise for plm
         pattern = r'encoder\.layer\.(.*?)\.'
-        num_layers = int(model.encoder.input_layer.ptm_model.config.num_hidden_layers)
+        num_layers = int(model.encoder.input_layer.plm_model.config.num_hidden_layers)
         groups = {"decay": defaultdict(list), "no_decay": defaultdict(list)} # record grouped params
         for n, p in params:
-            res = re.search(pattern, n) if 'ptm_model' in n else None
-            depth = int(res.group(1)) if res is not None else 0 if 'ptm_model' in n else num_layers
+            res = re.search(pattern, n) if 'plm_model' in n else None
+            depth = int(res.group(1)) if res is not None else 0 if 'plm_model' in n else num_layers
             if any(nd in n for nd in no_decay):
                 groups["no_decay"][int(depth)].append(p)
             else:
@@ -59,7 +59,7 @@ def set_optimizer(model, args, num_warmup_steps, num_training_steps, last_epoch=
             lr = args.lr * (args.layerwise_decay ** (num_layers - d))
             grouped_params.append({'params': list(set(groups["no_decay"][d])), 'lr': lr, 'weight_decay': 0.0})
         print('Use layerwise decay (rate %f) lr %f for pretrained model ...' % (args.layerwise_decay, args.lr))
-    else: # the same lr for ptm and other modules
+    else: # the same lr for plm and other modules
         grouped_params = [
             {'params': list(set([p for n, p in params if not any(nd in n for nd in no_decay)])), 'weight_decay': args.l2},
             {'params': list(set([p for n, p in params if any(nd in n for nd in no_decay)])), 'weight_decay': 0.0},

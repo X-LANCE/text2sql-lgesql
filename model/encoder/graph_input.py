@@ -42,14 +42,14 @@ class GraphInputLayer(nn.Module):
         inputs = self.rnn_layer(input_dict, batch)
         return inputs
 
-class GraphInputLayerPTM(nn.Module):
+class GraphInputLayerPLM(nn.Module):
 
-    def __init__(self, ptm='bert-base-uncased', hidden_size=256, dropout=0., subword_aggregation='mean',
+    def __init__(self, plm='bert-base-uncased', hidden_size=256, dropout=0., subword_aggregation='mean',
             schema_aggregation='head+tail', lazy_load=False):
-        super(GraphInputLayerPTM, self).__init__()
-        self.ptm_model = AutoModel.from_config(AutoConfig.from_pretrained(os.path.join('./pretrained_models', ptm))) \
-            if lazy_load else AutoModel.from_pretrained(os.path.join('./pretrained_models', ptm))
-        self.config = self.ptm_model.config
+        super(GraphInputLayerPLM, self).__init__()
+        self.plm_model = AutoModel.from_config(AutoConfig.from_pretrained(os.path.join('./pretrained_models', plm))) \
+            if lazy_load else AutoModel.from_pretrained(os.path.join('./pretrained_models', plm))
+        self.config = self.plm_model.config
         self.subword_aggregation = SubwordAggregation(self.config.hidden_size, subword_aggregation=subword_aggregation)
         self.dropout_layer = nn.Dropout(p=dropout)
         self.rnn_layer = InputRNNLayer(self.config.hidden_size, hidden_size, cell='lstm', schema_aggregation=schema_aggregation)
@@ -58,7 +58,7 @@ class GraphInputLayerPTM(nn.Module):
         pass
 
     def forward(self, batch):
-        outputs = self.ptm_model(**batch.inputs)[0] # final layer hidden states
+        outputs = self.plm_model(**batch.inputs)[0] # final layer hidden states
         question, table, column = self.subword_aggregation(outputs, batch)
         input_dict = {
             "question": self.dropout_layer(question),
@@ -82,8 +82,8 @@ class SubwordAggregation(nn.Module):
         tables: bsize x max_table_word_len x hidden_size
         columns: bsize x max_column_word_len x hidden_size
         """
-        old_questions, old_tables, old_columns = inputs.masked_select(batch.question_mask_ptm.unsqueeze(-1)), \
-            inputs.masked_select(batch.table_mask_ptm.unsqueeze(-1)), inputs.masked_select(batch.column_mask_ptm.unsqueeze(-1))
+        old_questions, old_tables, old_columns = inputs.masked_select(batch.question_mask_plm.unsqueeze(-1)), \
+            inputs.masked_select(batch.table_mask_plm.unsqueeze(-1)), inputs.masked_select(batch.column_mask_plm.unsqueeze(-1))
         questions = old_questions.new_zeros(batch.question_subword_lens.size(0), batch.max_question_subword_len, self.hidden_size)
         questions = questions.masked_scatter_(batch.question_subword_mask.unsqueeze(-1), old_questions)
         tables = old_tables.new_zeros(batch.table_subword_lens.size(0), batch.max_table_subword_len, self.hidden_size)
