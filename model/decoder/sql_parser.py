@@ -39,7 +39,7 @@ class SqlParser(nn.Module):
         cell_constructor = ONLSTM if args.lstm == 'onlstm' else LSTM
         self.decoder_lstm = cell_constructor(input_dim, args.lstm_hidden_size, num_layers=args.lstm_num_layers,
             chunk_num=args.chunk_size, dropout=args.dropout, dropconnect=args.drop_connect)
-        
+
         # transform column embedding to production embedding space
         self.column_lstm_input = nn.Linear(args.gnn_hidden_size, args.action_embed_size)
         # transform table embedding to production embedding space
@@ -67,7 +67,6 @@ class SqlParser(nn.Module):
                 encodings: encoded representations and mask matrix from encoder
                     bsize x seqlen x gnn_hidden_size
                 batch: see utils.batch, we use fields
-                    batch.table_mappings, batch.column_mappings,
                     batch.examples, batch.get_frontier_prod_idx(t),
                     batch.get_frontier_field_idx(t), batch.get_frontier_field_type_idx(t),
                     batch.max_action_num, example.tgt_action (ActionInfo)
@@ -115,14 +114,11 @@ class SqlParser(nn.Module):
                         elif isinstance(prev_action, ReduceAction):
                             prev_action_embed.append(self.production_embed.weight[len(self.grammar)])
                         elif isinstance(prev_action, SelectColumnAction):
-                            # map original column id into actual position in col matrix
-                            column_id = batch.column_mappings[e_id][prev_action.column_id]
                             # map schema item into prod embed space
-                            col_embed = self.column_lstm_input(col[e_id, column_id])
+                            col_embed = self.column_lstm_input(col[e_id, prev_action.column_id])
                             prev_action_embed.append(col_embed)
                         elif isinstance(prev_action, SelectTableAction):
-                            table_id = batch.table_mappings[e_id][prev_action.table_id]
-                            tab_embed = self.table_lstm_input(tab[e_id, table_id])
+                            tab_embed = self.table_lstm_input(tab[e_id, prev_action.table_id])
                             prev_action_embed.append(tab_embed)
                         else:
                             raise ValueError('Unrecognized previous action object!')
@@ -174,10 +170,10 @@ class SqlParser(nn.Module):
                         logprob_t = apply_rule_logprob[e_id, len(self.grammar)]
                         # print('Rule %s with prob %s' % ('Reduce', logprob_t.item()))
                     elif isinstance(action_t, SelectColumnAction):
-                        logprob_t = select_col_logprob[e_id, batch.column_mappings[e_id][action_t.column_id]]
+                        logprob_t = select_col_logprob[e_id, action_t.column_id]
                         # print('SelectColumn %s with prob %s' % (action_t.column_id, logprob_t.item()))
                     elif isinstance(action_t, SelectTableAction):
-                        logprob_t = select_tab_logprob[e_id, batch.table_mappings[e_id][action_t.table_id]]
+                        logprob_t = select_tab_logprob[e_id, action_t.table_id]
                         # print('SelectTable %s with prob %s' % (action_t.table_id, logprob_t.item()))
                     else:
                         raise ValueError('Unrecognized action object!')
@@ -190,13 +186,9 @@ class SqlParser(nn.Module):
         loss = - torch.stack([torch.stack(logprob_i).sum() for logprob_i in action_probs]).sum()
         return loss
 
-    def parse(self, encodings, mask, h0, batch, beam_size=5,
-            table_mapping=None, column_mapping=None, table_reverse_mapping=None, column_reverse_mapping=None):
+    def parse(self, encodings, mask, h0, batch, beam_size=5):
         """ Parse one by one, batch size for each args in encodings is 1
         """
-        if column_mapping is None:
-            column_mapping, table_mapping = list(range(batch.max_column_len)), list(range(batch.max_table_len))
-            column_reverse_mapping, table_reverse_mapping = column_mapping, table_mapping
         args = self.args
         zero_action_embed = encodings.new_zeros(args.action_embed_size)
         assert encodings.size(0) == 1 and mask.size(0) == 1
@@ -244,10 +236,10 @@ class SqlParser(nn.Module):
                     elif isinstance(prev_action, ReduceAction):
                         prev_action_embed.append(self.production_embed.weight[len(self.grammar)])
                     elif isinstance(prev_action, SelectColumnAction): # need to first map schema item into prod embed space
-                        col_embed = self.column_lstm_input(cur_col[e_id, column_mapping[prev_action.column_id]])
+                        col_embed = self.column_lstm_input(cur_col[e_id, prev_action.column_id])
                         prev_action_embed.append(col_embed)
                     elif isinstance(prev_action, SelectTableAction):
-                        tab_embed = self.table_lstm_input(cur_tab[e_id, table_mapping[prev_action.table_id]])
+                        tab_embed = self.table_lstm_input(cur_tab[e_id, prev_action.table_id])
                         prev_action_embed.append(tab_embed)
                     else:
                         raise ValueError('Unrecognized previous action object!')
@@ -320,7 +312,7 @@ class SqlParser(nn.Module):
                         for col_id in range(col_num):
                             col_sel_score = select_col_logprob[hyp_id, col_id]
                             new_hyp_score = hyp.score + col_sel_score
-                            meta_entry = {'action_type': 'sel_col', 'col_id': column_reverse_mapping[col_id],
+                            meta_entry = {'action_type': 'sel_col', 'col_id': col_id,
                                           'score': col_sel_score, 'new_hyp_score': new_hyp_score,
                                           'prev_hyp_id': hyp_id}
                             new_hyp_meta.append(meta_entry)
@@ -329,7 +321,7 @@ class SqlParser(nn.Module):
                         for tab_id in range(tab_num):
                             tab_sel_score = select_tab_logprob[hyp_id, tab_id]
                             new_hyp_score = hyp.score + tab_sel_score
-                            meta_entry = {'action_type': 'sel_tab', 'tab_id': table_reverse_mapping[tab_id],
+                            meta_entry = {'action_type': 'sel_tab', 'tab_id': tab_id,
                                           'score': tab_sel_score, 'new_hyp_score': new_hyp_score,
                                           'prev_hyp_id': hyp_id}
                             new_hyp_meta.append(meta_entry)

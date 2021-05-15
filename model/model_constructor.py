@@ -31,9 +31,7 @@ class Text2SQL(nn.Module):
             """ table_mappings and column_mappings are used to map original database ids to local ids,
             while reverse_mappings perform the opposite function, mapping local ids to database ids
             """
-            hyps.append(self.decoder.parse(encodings[i:i+1], mask[i:i+1], h0[i:i+1], batch, beam_size,
-                table_mapping=batch.table_mappings[i], column_mapping=batch.column_mappings[i],
-                table_reverse_mapping=batch.table_reverse_mappings[i], column_reverse_mapping=batch.column_reverse_mappings[i]))
+            hyps.append(self.decoder.parse(encodings[i:i+1], mask[i:i+1], h0[i:i+1], batch, beam_size))
         return hyps
 
     def pad_embedding_grad_zero(self, index=None):

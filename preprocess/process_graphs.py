@@ -3,11 +3,11 @@ import os, json, pickle, argparse, sys, time
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from preprocess.graph_utils import GraphProcessor
 
-def process_dataset_graph(processor, dataset, tables, method, output_path=None):
+def process_dataset_graph(processor, dataset, tables, method, output_path=None, skip_large=True):
     processed_dataset = []
     for idx, entry in enumerate(dataset):
         db = tables[entry['db_id']]
-        if len(db['column_names']) > 100:
+        if skip_large and len(db['column_names']) > 100:
             continue
         if (idx + 1) % 500 == 0:
             print('Processing the %d-th example ...' % (idx + 1))

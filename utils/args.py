@@ -9,9 +9,9 @@ def init_args(params=sys.argv[1:]):
     arg_parser = add_argument_decoder(arg_parser)
     opt = arg_parser.parse_args(params)
     if opt.model == 'rgatsql' and opt.local_and_nonlocal == 'msde':
-        opt.local_and_nonlocal = 'mmc'
+        opt.local_and_nonlocal = 'global'
     if opt.model == 'lgesql' and opt.local_and_nonlocal == 'global':
-        opt.local_and_nonlocal = 'local'
+        opt.local_and_nonlocal = 'msde'
     return opt
 
 def add_argument_base(arg_parser):

@@ -24,13 +24,9 @@ def from_example_list_base(ex_list, device='cpu', train=True):
     question_lens = [len(ex.question) for ex in ex_list]
     batch.question_lens = torch.tensor(question_lens, dtype=torch.long, device=device)
     batch.table_lens = torch.tensor([len(ex.table) for ex in ex_list], dtype=torch.long, device=device)
-    batch.table_mappings = [list(range(l)) for l in batch.table_lens.tolist()]
-    batch.table_reverse_mappings = batch.table_mappings
     table_word_lens = [len(t) for ex in ex_list for t in ex.table]
     batch.table_word_lens = torch.tensor(table_word_lens, dtype=torch.long, device=device)
     batch.column_lens = torch.tensor([len(ex.column) for ex in ex_list], dtype=torch.long, device=device)
-    batch.column_mappings = [list(range(l)) for l in batch.column_lens.tolist()]
-    batch.column_reverse_mappings = batch.column_mappings
     column_word_lens = [len(c) for ex in ex_list for c in ex.column]
     batch.column_word_lens = torch.tensor(column_word_lens, dtype=torch.long, device=device)
 
