@@ -13,7 +13,10 @@ class UnParser():
     @classmethod
     def from_grammar(cls, grammar: ASDLGrammar):
         grammar_name = grammar._grammar_name
-        if 'v1' in grammar_name:
+        if 'v0' in grammar_name:
+            from asdl.sql.unparser.unparser_v0 import UnParserV0
+            return UnParserV0(grammar)
+        elif 'v1' in grammar_name:
             from asdl.sql.unparser.unparser_v1 import UnParserV1
             return UnParserV1(grammar)
         elif 'v2' in grammar_name:
@@ -113,6 +116,50 @@ class UnParser():
             self.unparse_conds(right_cond.value, db, *args, **kargs)
         else:
             return self.unparse_cond(conds_ast, db, *args, **kargs)
-    
+
     def unparse_cond(self, cond_ast: AbstractSyntaxTree, db: dict, *args, **kargs):
-        raise NotImplementedError
+        ctr_name = cond_ast.production.constructor.name
+        val_unit_str = self.unparse_val_unit(cond_ast.fields[0].value, db, *args, **kargs)
+        val_str =  '( ' + self.unparse_sql(cond_ast.fields[1].value, db, *args, **kargs) + ' )' if len(cond_ast.fields) == 2 else '"value"'
+        if ctr_name.startswith('Between'):
+            return val_unit_str + ' BETWEEN ' + val_str + ' AND "value"'
+        else:
+            op_dict = {
+                'Between': ' BETWEEN ', 'Eq': ' = ', 'Gt': ' > ', 'Lt': ' < ', 'Ge': ' >= ', 'Le': ' <= ', 'Neq': ' != ',
+                'In': ' IN ', 'Like': ' LIKE ', 'NotIn': ' NOT IN ', 'NotLike': ' NOT LIKE '
+            }
+            ctr_name = ctr_name if 'SQL' not in ctr_name else ctr_name[:ctr_name.index('SQL')]
+            op = op_dict[ctr_name]
+            return op.join([val_unit_str, val_str])
+
+    def unparse_val_unit(self, val_unit_ast: AbstractSyntaxTree, db: dict, *args, **kargs):
+        unit_op = val_unit_ast.production.constructor.name
+        if unit_op == 'Unary':
+            return self.unparse_col_unit(val_unit_ast.fields[0].value, db, *args, **kargs)
+        else:
+            binary = {'Minus': ' - ', 'Plus': ' + ', 'Times': ' * ', 'Divide': ' / '}
+            op = binary[unit_op]
+            return op.join([self.unparse_col_unit(val_unit_ast.fields[0].value, db, *args, **kargs),
+                self.unparse_col_unit(val_unit_ast.fields[1].value, db, *args, **kargs)])
+            # col_id1, col_id2 = int(val_unit_ast.fields[0].value), int(val_unit_ast.fields[1].value)
+            # tab_id1, col_name1 = db['column_names_original'][col_id1]
+            # if col_id1 != 0:
+                # tab_name1 = db['table_names_original'][tab_id1]
+                # col_name1 = tab_name1 + '.' + col_name1
+            # tab_id2, col_name2 = db['column_names_original'][col_id2]
+            # if col_id2 != 0:
+                # tab_name2 = db['table_names_original'][tab_id2]
+                # col_name2 = tab_name2 + '.' + col_name2
+            # return op.join([col_name1, col_name2])
+
+    def unparse_col_unit(self, col_unit_ast: AbstractSyntaxTree, db: dict, *args, **kargs):
+        agg = col_unit_ast.production.constructor.name
+        col_id = int(col_unit_ast.fields[0].value)
+        tab_id, col_name = db['column_names_original'][col_id]
+        if col_id != 0:
+            tab_name = db['table_names_original'][tab_id]
+            col_name = tab_name + '.' + col_name
+        if agg == 'None':
+            return col_name
+        else: # Max/Min/Count/Sum/Avg
+            return agg.upper() + '(' + col_name + ')'

@@ -38,7 +38,7 @@
 # 2. from conds, distinct and value generation are also not considered
 # 3. for select items, we use val_unit instead of (agg, val_unit)
 # 4. for orderby items, we use col_unit instead of val_unit
-# 5. for groupby items, we use col_unit
+# 5. for groupby items, we use col_unit instead of col_id
 # 6. predict from clause first, to obtain an overview of the entire query graph
 
 col_id, tab_id

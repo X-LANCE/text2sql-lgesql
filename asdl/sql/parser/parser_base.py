@@ -14,7 +14,10 @@ class Parser():
     @classmethod
     def from_grammar(cls, grammar: ASDLGrammar):
         grammar_name = grammar._grammar_name
-        if 'v1' in grammar_name:
+        if 'v0' in grammar_name:
+            from asdl.sql.parser.parser_v0 import ParserV0
+            return ParserV0(grammar)
+        elif 'v1' in grammar_name:
             from asdl.sql.parser.parser_v1 import ParserV1
             return ParserV1(grammar)
         elif 'v2' in grammar_name:
@@ -133,4 +136,40 @@ class Parser():
         return root_node
 
     def parse_cond(self, cond: list):
-        raise NotImplementedError
+        not_op, cmp_op, val_unit, val1, val2 = cond
+        not_op = '^' if not_op else ''
+        sql_val = 'sql' if type(val1) == dict else ''
+        op_list = ('not', 'between', '=', '>', '<', '>=', '<=', '!=', 'in', 'like', 'is', 'exists')
+        cmp_op = not_op + op_list[cmp_op] + sql_val
+        op_dict = {
+            'between': 'Between', '=': 'Eq', '>': 'Gt', '<': 'Lt', '>=': 'Ge', '<=': 'Le', '!=': 'Neq',
+            'insql': 'InSQL', 'like': 'Like', '^insql': 'NotInSQL', '^like': 'NotLike', 'betweensql': 'BetweenSQL', '=sql': 'EqSQL',
+            '>sql': 'GtSQL', '<sql': 'LtSQL', '>=sql': 'GeSQL', '<=sql': 'LeSQL', '!=sql': 'NeqSQL'
+        }
+        ast_node = AbstractSyntaxTree(self.grammar.get_prod_by_ctr_name(op_dict[cmp_op]))
+        val_unit_field = ast_node.fields[0]
+        val_unit_field.add_value(self.parse_val_unit(val_unit))
+        if len(ast_node.fields) == 2:
+            val_field = ast_node.fields[1]
+            val_field.add_value(self.parse_sql(val1))
+        return ast_node
+
+    def parse_val_unit(self, val_unit: list):
+        unit_op, col_unit1, col_unit2 = val_unit
+        unit_op_list = ['Unary', 'Minus', 'Plus', 'Times', 'Divide']
+        ast_node = AbstractSyntaxTree(self.grammar.get_prod_by_ctr_name(unit_op_list[unit_op]))
+        if unit_op == 0:
+            ast_node.fields[0].add_value(self.parse_col_unit(col_unit1))
+        else:
+            # ast_node.fields[0].add_value(int(col_unit1[1]))
+            # ast_node.fields[1].add_value(int(col_unit2[1]))
+            ast_node.fields[0].add_value(self.parse_col_unit(col_unit1))
+            ast_node.fields[1].add_value(self.parse_col_unit(col_unit2))
+        return ast_node
+
+    def parse_col_unit(self, col_unit: list):
+        agg_op, col_id, distinct_flag = col_unit
+        agg_op_list = ['None', 'Max', 'Min', 'Count', 'Sum', 'Avg']
+        ast_node = AbstractSyntaxTree(self.grammar.get_prod_by_ctr_name(agg_op_list[agg_op]))
+        ast_node.fields[0].add_value(int(col_id))
+        return ast_node
