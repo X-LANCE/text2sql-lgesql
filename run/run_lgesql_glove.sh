@@ -1,16 +1,16 @@
-task=lgesql_layers
-seed=999
+task=lgesql
+seed=$1
 device=0
 testing='' #'--testing'
 read_model_path=''
 
 model=lgesql
 output_model=with_pruning # without_pruning
-local_and_nonlocal=$1 # mmc, msde, local
+local_and_nonlocal=$2 # mmc, msde, local
 embed_size=300
 schema_aggregation=head+tail
 gnn_hidden_size=256
-gnn_num_layers=$2
+gnn_num_layers=8
 relation_share_heads=$3 #'--relation_share_heads'
 score_function='affine'
 num_heads=8
