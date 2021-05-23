@@ -1,7 +1,7 @@
 #coding=utf8
+from pickle import FALSE, TRUE
 import sys, tempfile, os
 import numpy as np
-from asdl.sql.sql_transition_system import SelectColumnAction, SelectTableAction
 from evaluation import evaluate, build_foreign_key_map_from_json, build_valid_col_units, rebuild_sql_val, rebuild_sql_col, eval_exec_match
 from evaluation import Evaluator as Engine
 from process_sql import get_schema, Schema, get_sql
@@ -185,3 +185,89 @@ class Evaluator():
             sys.stdout = old_print
             of.close()
         return float(all_exact_acc)
+
+def valid_agg_for_column_type(agg, col_type):
+    if agg in [1, 2, 4, 5]:
+        return (col_type in ['time', 'number'])
+    return True
+
+class Checker():
+
+    def validity_check(self, sql: str, db: dict):
+        """ Check whether the given sql query is valid, including:
+        1. only use columns in tables mentioned in FROM clause
+        2. comparison operator or MAX/MIN/SUM only applied to columns of type number/time
+        @params:
+            sql(str): SQL query
+            db(dict): database schema
+        @return:
+            flag(boolean)
+        """
+        schema = Schema(get_schema(db['db_id']))
+        try:
+            sql = get_sql(schema, sql)
+            return self.sql_check(sql, db)
+        except Exception as e:
+            return False
+
+    def sql_check(self, sql: dict, db: dict):
+        if sql['intersect']:
+            return self.sqlunit_check(sql, db) & self.sqlunit_check(sql['intersect'], db)
+        if sql['union']:
+            return self.sqlunit_check(sql, db) & self.sqlunit_check(sql['union'], db)
+        if sql['except']:
+            return self.sqlunit_check(sql, db) & self.sqlunit_check(sql['except'], db)
+        return self.sqlunit_check(sql, db)
+
+    def sqlunit_check(self, sql: dict, db: dict):
+        if sql['from']['table_units'][0][0] == 'sql':
+            if not self.sql_check(sql['from']['table_units'][0][1], db): return False
+            table_ids = []
+        else:
+            table_ids = list(map(lambda table_unit: table_unit[1], sql['from']['table_units']))
+        return self.select_check(sql['select'], table_ids, db) & \
+            self.cond_check(sql['where'], table_ids, db) & \
+            self.groupby_check(sql['groupBy'], table_ids, db) & \
+            self.cond_check(sql['having'], table_ids, db) & \
+            self.orderby_check(sql['orderBy'], table_ids, db)
+
+    def select_check(self, select, table_ids: list, db: dict):
+        select = select[1]
+        for agg_id, val_unit in select:
+            if agg_id == 0 and (not self.valunit_check(val_unit, table_ids, db)):
+                return False
+            else:
+                unit_op, col_unit1, col_unit2 = val_unit
+                pass
+        return True
+    
+    def cond_check(self, cond, table_ids: list, db: dict):
+        if len(cond) == 0:
+            return True
+        for idx in range(0, len(cond), 2):
+            cond_unit = cond[idx]
+            _, cmp_op, val_unit, val1, val2 = cond_unit
+            pass
+
+    def groupby_check(self, groupby, table_ids: list, db: dict):
+        if not groupby: return True
+        for col_unit in groupby:
+            if not self.colunit_check(col_unit, table_ids, db): return False
+        return True
+
+    def orderby_check(self, orderby, table_ids: list, db: dict):
+        if not orderby: return True
+        orderby = orderby[1]
+        for val_unit in orderby:
+            if not self.valunit_check(val_unit, table_ids, db): return False
+        return True
+
+    def colunit_check(self, col_unit: list, table_ids: list, db: dict):
+        agg_id, col_id, _ = col_unit
+        tab_id = db['column_names'][col_id][0]
+        if (tab_id not in table_ids) and (tab_id != -1): return False
+        col_type = db['column_types'][col_id]
+        return valid_agg_for_column_type(agg_id, col_type)
+
+    def valunit_check(self, val_unit: list, table_ids: list, db: dict):
+        unit_op, col_unit1, col_unit2 = val_unit
