@@ -14,6 +14,7 @@ class Evaluator():
         self.kmaps = build_foreign_key_map_from_json(table_path)
         self.database_dir = database_dir
         self.engine = Engine()
+        self.checker = Checker()
         self.acc_dict = {
             "sql": self.sql_acc, # use golden sql as references
             "ast": self.ast_acc, # compare ast accuracy, ast may be incorrect when constructed from raw sql
@@ -186,17 +187,12 @@ class Evaluator():
             of.close()
         return float(all_exact_acc)
 
-def valid_agg_for_column_type(agg, col_type):
-    if agg in [1, 2, 4, 5]:
-        return (col_type in ['time', 'number'])
-    return True
-
 class Checker():
 
     def validity_check(self, sql: str, db: dict):
         """ Check whether the given sql query is valid, including:
         1. only use columns in tables mentioned in FROM clause
-        2. comparison operator or MAX/MIN/SUM only applied to columns of type number/time
+        2. comparison operator or MAX/MIN/SUM/AVG only applied to columns of type number/time
         @params:
             sql(str): SQL query
             db(dict): database schema
@@ -234,11 +230,9 @@ class Checker():
     def select_check(self, select, table_ids: list, db: dict):
         select = select[1]
         for agg_id, val_unit in select:
-            if agg_id == 0 and (not self.valunit_check(val_unit, table_ids, db)):
+            if not self.valunit_check(val_unit, table_ids, db): return False
+            if agg_id in [1, 2, 4, 5] and (self.valunit_type(val_unit, db) not in ['number', 'time']):
                 return False
-            else:
-                unit_op, col_unit1, col_unit2 = val_unit
-                pass
         return True
     
     def cond_check(self, cond, table_ids: list, db: dict):
@@ -247,7 +241,16 @@ class Checker():
         for idx in range(0, len(cond), 2):
             cond_unit = cond[idx]
             _, cmp_op, val_unit, val1, val2 = cond_unit
-            pass
+            if cmp_op in [3, 4, 5, 6]:
+                flag = self.valunit_check(val_unit, table_ids, db) & (self.valunit_type(val_unit, db) in ['number', 'time'])
+            else:
+                flag = self.valunit_check(val_unit, table_ids, db)
+            if type(val1) == dict:
+                flag &= self.sql_check(val1, db)
+            if type(val2) == dict:
+                flag &= self.sql_check(val2, db)
+            if not flag: return False
+        return True
 
     def groupby_check(self, groupby, table_ids: list, db: dict):
         if not groupby: return True
@@ -263,11 +266,39 @@ class Checker():
         return True
 
     def colunit_check(self, col_unit: list, table_ids: list, db: dict):
+        """ Check from the following aspects:
+        1. column belongs to the tables in FROM clause
+        2. column type is valid for AGG_OP
+        """
         agg_id, col_id, _ = col_unit
+        if col_id == 0: return True
         tab_id = db['column_names'][col_id][0]
-        if (tab_id not in table_ids) and (tab_id != -1): return False
+        if tab_id not in table_ids: return False
         col_type = db['column_types'][col_id]
-        return valid_agg_for_column_type(agg_id, col_type)
+        if agg_id in [1, 2, 4, 5]: # MAX, MIN, SUM, AVG
+            return (col_type in ['time', 'number'])
+        return True
 
     def valunit_check(self, val_unit: list, table_ids: list, db: dict):
         unit_op, col_unit1, col_unit2 = val_unit
+        if unit_op == 0:
+            return self.colunit_check(col_unit1, table_ids, db)
+        if not (self.colunit_check(col_unit1, table_ids, db) and self.colunit_check(col_unit2, table_ids, db)):
+            return False
+        agg_id1, col_unit1, _ = col_unit1
+        agg_id2, col_unit2, _ = col_unit2
+        # COUNT/SUM/AVG -> number
+        t1 = 'number' if agg_id1 > 2 else db['column_types'][col_unit1[1]]
+        t2 = 'number' if agg_id2 > 2 else db['column_types'][col_unit2[1]]
+        if (t1 not in ['number', 'time']) or (t2 not in ['number', 'time']) or t1 != t2:
+            return False
+        return True
+
+    def valunit_type(self, val_unit: list, db: dict):
+        unit_op, col_unit1, col_unit2 = val_unit
+        if unit_op == 0:
+            agg_id, col_id, _ = col_unit1
+            if agg_id > 2: return 'number'
+            else: return ('number' if col_id == 0 else db['column_types'][col_id])
+        else:
+            return 'number'

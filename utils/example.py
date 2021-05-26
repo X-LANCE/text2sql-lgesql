@@ -15,12 +15,12 @@ from itertools import chain
 class Example():
 
     @classmethod
-    def configuration(cls, plm=None, method='lgesql', table_path='data/tables.json', tables='data/tables.bin'):
+    def configuration(cls, plm=None, method='lgesql', table_path='data/tables.json', tables='data/tables.bin', db_dir='data/database'):
         cls.plm, cls.method = plm, method
         cls.grammar = ASDLGrammar.from_filepath(GRAMMAR_FILEPATH)
         cls.trans = TransitionSystem.get_class_by_lang('sql')(cls.grammar)
         cls.tables = pickle.load(open(tables, 'rb')) if type(tables) == str else tables
-        cls.evaluator = Evaluator(cls.trans, table_path)
+        cls.evaluator = Evaluator(cls.trans, table_path, db_dir)
         if plm is None:
             cls.word2vec = Word2vecUtils()
             cls.tokenizer = lambda x: x
