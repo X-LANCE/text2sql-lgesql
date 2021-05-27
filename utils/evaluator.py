@@ -1,7 +1,8 @@
 #coding=utf8
-from pickle import FALSE, TRUE
 import sys, tempfile, os
+import pickle, json
 import numpy as np
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from evaluation import evaluate, build_foreign_key_map_from_json, build_valid_col_units, rebuild_sql_val, rebuild_sql_col, eval_exec_match
 from evaluation import Evaluator as Engine
 from process_sql import get_schema, Schema, get_sql
@@ -189,6 +190,10 @@ class Evaluator():
 
 class Checker():
 
+    def __init__(self, db_dir='data/database'):
+        super(Checker, self).__init__()
+        self.db_dir = db_dir
+
     def validity_check(self, sql: str, db: dict):
         """ Check whether the given sql query is valid, including:
         1. only use columns in tables mentioned in FROM clause
@@ -199,12 +204,16 @@ class Checker():
         @return:
             flag(boolean)
         """
-        schema = Schema(get_schema(db['db_id']))
-        try:
-            sql = get_sql(schema, sql)
-            return self.sql_check(sql, db)
-        except Exception as e:
-            return False
+        db_name = db['db_id']
+        db_path = os.path.join(self.db_dir, db_name, db_name + ".sqlite")
+        schema = Schema(get_schema(db_path))
+        # try:
+        sql = get_sql(schema, sql)
+        print(sql)
+        return self.sql_check(sql, db)
+        # except Exception as e:
+            # print('Runtime error occurs:', e)
+            # return False
 
     def sql_check(self, sql: dict, db: dict):
         if sql['intersect']:
@@ -231,20 +240,20 @@ class Checker():
         select = select[1]
         for agg_id, val_unit in select:
             if not self.valunit_check(val_unit, table_ids, db): return False
-            if agg_id in [1, 2, 4, 5] and (self.valunit_type(val_unit, db) not in ['number', 'time']):
-                return False
+            # if agg_id in [1, 2, 4, 5] and (self.valunit_type(val_unit, db) not in ['number', 'time']):
+                # return False
         return True
-    
+
     def cond_check(self, cond, table_ids: list, db: dict):
         if len(cond) == 0:
             return True
         for idx in range(0, len(cond), 2):
             cond_unit = cond[idx]
             _, cmp_op, val_unit, val1, val2 = cond_unit
-            if cmp_op in [3, 4, 5, 6]:
-                flag = self.valunit_check(val_unit, table_ids, db) & (self.valunit_type(val_unit, db) in ['number', 'time'])
-            else:
-                flag = self.valunit_check(val_unit, table_ids, db)
+            # if cmp_op in [3, 4, 5, 6]:
+                # flag = self.valunit_check(val_unit, table_ids, db) & (self.valunit_type(val_unit, db) in ['number', 'time'])
+            # else:
+            flag = self.valunit_check(val_unit, table_ids, db)
             if type(val1) == dict:
                 flag &= self.sql_check(val1, db)
             if type(val2) == dict:
@@ -274,9 +283,9 @@ class Checker():
         if col_id == 0: return True
         tab_id = db['column_names'][col_id][0]
         if tab_id not in table_ids: return False
-        col_type = db['column_types'][col_id]
-        if agg_id in [1, 2, 4, 5]: # MAX, MIN, SUM, AVG
-            return (col_type in ['time', 'number'])
+        # col_type = db['column_types'][col_id]
+        # if agg_id in [1, 2, 4, 5]: # MAX, MIN, SUM, AVG
+            # return (col_type in ['time', 'number'])
         return True
 
     def valunit_check(self, val_unit: list, table_ids: list, db: dict):
@@ -285,13 +294,13 @@ class Checker():
             return self.colunit_check(col_unit1, table_ids, db)
         if not (self.colunit_check(col_unit1, table_ids, db) and self.colunit_check(col_unit2, table_ids, db)):
             return False
-        agg_id1, col_unit1, _ = col_unit1
-        agg_id2, col_unit2, _ = col_unit2
+        # agg_id1, col_unit1, _ = col_unit1
+        # agg_id2, col_unit2, _ = col_unit2
         # COUNT/SUM/AVG -> number
-        t1 = 'number' if agg_id1 > 2 else db['column_types'][col_unit1[1]]
-        t2 = 'number' if agg_id2 > 2 else db['column_types'][col_unit2[1]]
-        if (t1 not in ['number', 'time']) or (t2 not in ['number', 'time']) or t1 != t2:
-            return False
+        # t1 = 'number' if agg_id1 > 2 else db['column_types'][col_unit1[1]]
+        # t2 = 'number' if agg_id2 > 2 else db['column_types'][col_unit2[1]]
+        # if (t1 not in ['number', 'time']) or (t2 not in ['number', 'time']) or t1 != t2:
+            # return False
         return True
 
     def valunit_type(self, val_unit: list, db: dict):
@@ -302,3 +311,17 @@ class Checker():
             else: return ('number' if col_id == 0 else db['column_types'][col_id])
         else:
             return 'number'
+
+if __name__ == '__main__':
+    checker = Checker()
+    tables = pickle.load(open('data/tables.bin', 'rb'))
+    train_sql, dev_sql = json.load(open('data/train.json', 'r')), json.load(open('data/dev.json', 'r'))
+    count = 0
+    for idx, ex in enumerate(train_sql):
+        sql, db = ex['query'].strip(), ex['db_id']
+        flag = checker.validity_check(sql, tables[db])
+        if not flag:
+            print(idx, ': ' + sql)
+            count += 1
+            input('Next ...')
+    print('Total invalid is %d' % (count))
