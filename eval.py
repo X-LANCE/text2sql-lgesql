@@ -42,7 +42,7 @@ args = parser.parse_args(sys.argv[1:])
 params = json.load(open(os.path.join(args.saved_model, 'params.json'), 'r'), object_hook=lambda d: Namespace(**d))
 params.lazy_load = True # load PLM from AutoConfig instead of AutoModel.from_pretrained(...)
 dataset, tables = preprocess_database_and_dataset(db_dir=args.db_dir, table_path=args.table_path, dataset_path=args.dataset_path, method=params.model)
-Example.configuration(plm=params.plm, method=params.model, tables=tables, table_path=args.table_path)
+Example.configuration(plm=params.plm, method=params.model, tables=tables, table_path=args.table_path, db_dir=args.db_dir)
 dataset = load_examples(dataset, tables)
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
@@ -60,8 +60,10 @@ with torch.no_grad():
         hyps = model.parse(current_batch, args.beam_size)
         all_hyps.extend(hyps)
 with open(args.output_path, 'w', encoding='utf8') as of:
+    evaluator = Example.evaluator
     for idx, hyp in enumerate(all_hyps):
-        best_ast = hyp[0].tree # by default, the top beam prediction
-        pred_sql = Example.trans.ast_to_surface_code(best_ast, dataset[idx].db)
+        pred_sql = evaluator.obtain_sql(hyp, dataset[idx].db)
+        # best_ast = hyp[0].tree # by default, the top beam prediction
+        # pred_sql = Example.trans.ast_to_surface_code(best_ast, dataset[idx].db)
         of.write(pred_sql + '\n')
 print('Evaluation costs %.4fs .' % (time.time() - start_time))

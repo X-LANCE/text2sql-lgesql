@@ -43,12 +43,12 @@ class Evaluator():
                 scores[each].append(accuracy)
         return scores['all'][2]
 
-    def acc(self, pred_hyps, dataset, output_path=None, acc_type='sql', etype='match'):
+    def acc(self, pred_hyps, dataset, output_path=None, acc_type='sql', etype='match', use_checker=False):
         assert len(pred_hyps) == len(dataset) and acc_type in self.acc_dict and etype in ['match', 'exec']
         acc_method = self.acc_dict[acc_type]
-        return acc_method(pred_hyps, dataset, output_path, etype)
+        return acc_method(pred_hyps, dataset, output_path, etype, use_checker)
 
-    def beam_acc(self, pred_hyps, dataset, output_path, etype):
+    def beam_acc(self, pred_hyps, dataset, output_path, etype, use_checker):
         scores, results = {}, []
         for each in ['easy', 'medium', 'hard', 'extra', 'all']:
             scores[each] = [0, 0.] # first is count, second is total score
@@ -131,7 +131,7 @@ class Evaluator():
             score = float(self.engine.eval_exact_match(p_sql, g_sql))
         return score, hardness
 
-    def ast_acc(self, pred_hyps, dataset, output_path, etype):
+    def ast_acc(self, pred_hyps, dataset, output_path, etype, use_checker):
         pred_asts = [hyp[0].tree for hyp in pred_hyps]
         ref_asts = [ex.ast for ex in dataset]
         dbs = [ex.db for ex in dataset]
@@ -161,12 +161,15 @@ class Evaluator():
             of.close()
         return float(all_exact_acc)
 
-    def sql_acc(self, pred_hyps, dataset, output_path, etype):
+    def sql_acc(self, pred_hyps, dataset, output_path, etype, use_checker):
         pred_sqls, ref_sqls = [], [ex.query for ex in dataset]
         dbs = [ex.db for ex in dataset]
         for idx, hyp in enumerate(pred_hyps):
-            best_ast = hyp[0].tree # by default, the top beam prediction
-            pred_sql = self.transition_system.ast_to_surface_code(best_ast, dbs[idx])
+            if use_checker:
+                pred_sql = self.obtain_sql(hyp, dbs[idx])
+            else:
+                best_ast = hyp[0].tree # by default, the top beam prediction
+                pred_sql = self.transition_system.ast_to_surface_code(best_ast, dbs[idx])
             pred_sqls.append(pred_sql)
         with tempfile.NamedTemporaryFile('w+t', encoding='utf8', suffix='.sql') as tmp_pred, \
             tempfile.NamedTemporaryFile('w+t', encoding='utf8', suffix='.sql') as tmp_ref:
@@ -187,6 +190,19 @@ class Evaluator():
             sys.stdout = old_print
             of.close()
         return float(all_exact_acc)
+
+    def obtain_sql(self, hyps, db):
+        beam = len(hyps)
+        for hyp in hyps:
+            cur_ast = hyp.tree
+            pred_sql = self.transition_system.ast_to_surface_code(cur_ast, db)
+            if self.checker.validity_check(pred_sql, db['db_id']):
+                sql = pred_sql
+                break
+        else:
+            best_ast = hyps[0].tree
+            sql = self.transition_system.ast_to_surface_code(best_ast, db)
+        return sql
 
 class Checker():
 
@@ -369,8 +385,9 @@ class SchemaID():
 if __name__ == '__main__':
     checker = Checker('data/tables.json', 'data/database')
     train, dev = json.load(open('data/train.json', 'r')), json.load(open('data/dev.json', 'r'))
+    test = json.load(open('data/test.json', 'r'))
     count = 0
-    for idx, ex in enumerate(dev):
+    for idx, ex in enumerate(train):
         sql, db = ex['query'].strip(), ex['db_id']
         flag = checker.validity_check(sql, db)
         if not flag:

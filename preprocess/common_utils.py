@@ -41,7 +41,7 @@ class Preprocessor():
         super(Preprocessor, self).__init__()
         self.db_dir = db_dir
         self.db_content = db_content
-        self.nlp = stanza.Pipeline('en', processors='tokenize,pos,lemma') #, tokenize_pretokenized=True)
+        self.nlp = stanza.Pipeline('en', processors='tokenize,pos,lemma')#, use_gpu=False)
         self.stopwords = stopwords.words("english")
 
     def pipeline(self, entry: dict, db: dict, verbose: bool = False):
