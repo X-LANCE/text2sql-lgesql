@@ -1,16 +1,16 @@
-task=rgatsql_layers
-seed=999
+task=rgatsql
+seed=$1
 device=0
 testing='' #'--testing'
 read_model_path=''
 
 model=rgatsql
 output_model=with_pruning # without_pruning
-local_and_nonlocal=$1 # mmc, local, global
+local_and_nonlocal=$2 # mmc, local, global
 embed_size=300
 schema_aggregation=head+tail
 gnn_hidden_size=256
-gnn_num_layers=$2
+gnn_num_layers=8
 relation_share_layers='' #'--relation_share_layers'
 relation_share_heads=$3 #'--relation_share_heads'
 score_function=affine

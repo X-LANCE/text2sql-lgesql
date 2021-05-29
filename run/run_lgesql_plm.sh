@@ -1,4 +1,4 @@
-task=lgesql_large_backup
+task=lgesql_large
 seed=999
 device=0
 testing='' #'--testing'
@@ -42,8 +42,8 @@ l2=0.1
 smoothing=0.15
 warmup_ratio=0.1
 lr_schedule=linear
-eval_after_epoch=120
-max_epoch=200
+eval_after_epoch=100
+max_epoch=160
 max_norm=5
 beam_size=5
 

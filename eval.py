@@ -1,9 +1,9 @@
 #coding=utf8
 import sys, os, json, pickle, argparse, time, torch
 from argparse import Namespace
-# os.environ['NLTK_DATA'] = os.path.join(os.path.sep, 'root', 'nltk_data')
-# os.environ["STANZA_RESOURCES_DIR"] = os.path.join(os.path.sep, 'root', 'stanza_resources')
-# os.environ['EMBEDDINGS_ROOT'] = os.path.join(os.path.sep, 'root', '.embeddings')
+os.environ['NLTK_DATA'] = os.path.join(os.path.sep, 'root', 'nltk_data')
+os.environ["STANZA_RESOURCES_DIR"] = os.path.join(os.path.sep, 'root', 'stanza_resources')
+os.environ['EMBEDDINGS_ROOT'] = os.path.join(os.path.sep, 'root', '.embeddings')
 from preprocess.process_dataset import process_tables, process_dataset
 from preprocess.process_graphs import process_dataset_graph
 from preprocess.common_utils import Preprocessor
@@ -37,6 +37,7 @@ parser.add_argument('--saved_model', default='saved_models/glove42B', help='path
 parser.add_argument('--output_path', default='predicted_sql.txt', help='output predicted sql file')
 parser.add_argument('--batch_size', default=20, type=int, help='batch size for evaluation')
 parser.add_argument('--beam_size', default=5, type=int, help='beam search size')
+parser.add_argument('--use_gpu', action='store_true', help='whether use gpu')
 args = parser.parse_args(sys.argv[1:])
 
 params = json.load(open(os.path.join(args.saved_model, 'params.json'), 'r'), object_hook=lambda d: Namespace(**d))
@@ -45,7 +46,7 @@ dataset, tables = preprocess_database_and_dataset(db_dir=args.db_dir, table_path
 Example.configuration(plm=params.plm, method=params.model, tables=tables, table_path=args.table_path, db_dir=args.db_dir)
 dataset = load_examples(dataset, tables)
 
-device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+device = torch.device("cuda:0") if torch.cuda.is_available() and args.use_gpu else torch.device("cpu")
 model = Registrable.by_name('text2sql')(params, Example.trans).to(device)
 check_point = torch.load(open(os.path.join(args.saved_model, 'model.bin'), 'rb'), map_location=device)
 model.load_state_dict(check_point['model'])
