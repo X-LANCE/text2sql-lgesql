@@ -61,7 +61,6 @@ def decode(choice, output_path, acc_type='sql', use_checker=False):
             hyps = model.parse(current_batch, args.beam_size)
             all_hyps.extend(hyps)
         acc = evaluator.acc(all_hyps, dataset, output_path, acc_type=acc_type, etype='match', use_checker=use_checker)
-        # acc = evaluator.error_analysis(all_hyps, dataset, output_path, etype='match')
     torch.cuda.empty_cache()
     gc.collect()
     return acc
@@ -130,8 +129,8 @@ else:
     # logger.info("Evaluation costs %.2fs ; Train dataset exact match acc is %.4f ." % (time.time() - start_time, train_acc))
     start_time = time.time()
     dev_acc = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval'), acc_type='sql')
+    # logger.info("Evaluation costs %.2fs ; Dev dataset exact match acc is %.4f ." % (time.time() - start_time, dev_acc))
     dev_checker_acc = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval.checker'), acc_type='sql', use_checker=True)
     logger.info("Evaluation costs %.2fs ; Dev dataset exact match/use checker acc is %.4f/%.4f ." % (time.time() - start_time, dev_acc, dev_checker_acc))
-    # logger.info("Evaluation costs %.2fs ; Dev dataset exact match acc is %.4f ." % (time.time() - start_time, dev_acc))
     # dev_acc_beam = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval.beam' + str(args.beam_size)), acc_type='beam')
     # logger.info("Evaluation costs %.2fs ; Dev dataset exact match/inner beam acc is %.4f/%.4f ." % (time.time() - start_time, dev_acc, dev_acc_beam))
