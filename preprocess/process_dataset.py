@@ -16,14 +16,13 @@ def process_example(processor, entry, db, trans, verbose=False):
     entry['actions'] = get_action_infos(tgt_actions=actions)
     return entry
 
-def process_tables(processor, tables_list, output_path=None, skip_large=False, verbose=False):
+def process_tables(processor, tables_list, output_path=None, verbose=False):
     tables = {}
     for each in tables_list:
-        if skip_large and len(each['column_names']) > 100: continue
         if verbose:
             print('*************** Processing database %s **************' % (each['db_id']))
         tables[each['db_id']] = processor.preprocess_database(each, verbose=verbose)
-    print('In total, process %d databases , skip %d extremely large databases.' % (len(tables), len(tables_list) - len(tables)))
+    print('In total, process %d databases .' % (len(tables))
     if output_path is not None:
         pickle.dump(tables, open(output_path, 'wb'))
     return tables
@@ -64,7 +63,7 @@ if __name__ == '__main__':
         tables_list = json.load(open(args.raw_table_path, 'r'))
         print('Firstly, preprocess the original databases ...')
         start_time = time.time()
-        tables = process_tables(processor, tables_list, args.table_path, args.skip_large, args.verbose)
+        tables = process_tables(processor, tables_list, args.table_path, args.verbose)
         print('Databases preprocessing costs %.4fs .' % (time.time() - start_time))
     else:
         tables = pickle.load(open(args.table_path, 'rb'))
