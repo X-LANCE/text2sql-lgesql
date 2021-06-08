@@ -1,9 +1,10 @@
 #coding=utf8
 import sys, os, json, pickle, argparse, time, torch
 from argparse import Namespace
-os.environ['NLTK_DATA'] = os.path.join(os.path.sep, 'root', 'nltk_data')
-os.environ["STANZA_RESOURCES_DIR"] = os.path.join(os.path.sep, 'root', 'stanza_resources')
-os.environ['EMBEDDINGS_ROOT'] = os.path.join(os.path.sep, 'root', '.embeddings')
+# These three lines are used in the docker environment rhythmcao/text2sql:v2.0
+# os.environ['NLTK_DATA'] = os.path.join(os.path.sep, 'root', 'nltk_data')
+# os.environ["STANZA_RESOURCES_DIR"] = os.path.join(os.path.sep, 'root', 'stanza_resources')
+# os.environ['EMBEDDINGS_ROOT'] = os.path.join(os.path.sep, 'root', '.embeddings')
 from preprocess.process_dataset import process_tables, process_dataset
 from preprocess.process_graphs import process_dataset_graph
 from preprocess.common_utils import Preprocessor

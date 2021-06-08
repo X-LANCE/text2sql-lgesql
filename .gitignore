@@ -1,6 +1,4 @@
-.pytest_cache
 .vscode
-.ipynb_checkpoints
 *.log
 __pycache__
 */__pycache__
@@ -9,10 +7,7 @@ __pycache__
 */*/*/*/__pycache__
 pretrained_models
 saved_models
-history
 data
 log
 exp
-tmp
 *.sbatch
-grid_search.py
