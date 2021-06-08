@@ -22,7 +22,7 @@ def process_tables(processor, tables_list, output_path=None, verbose=False):
         if verbose:
             print('*************** Processing database %s **************' % (each['db_id']))
         tables[each['db_id']] = processor.preprocess_database(each, verbose=verbose)
-    print('In total, process %d databases .' % (len(tables))
+    print('In total, process %d databases .' % (len(tables)))
     if output_path is not None:
         pickle.dump(tables, open(output_path, 'wb'))
     return tables
