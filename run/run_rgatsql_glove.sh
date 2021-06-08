@@ -1,18 +1,18 @@
 task=rgatsql
-seed=$1
+seed=999
 device=0
 testing='' #'--testing'
 read_model_path=''
 
 model=rgatsql
 output_model=with_pruning # without_pruning
-local_and_nonlocal=$2 # mmc, local, global
+local_and_nonlocal=$1 # mmc, local, global
 embed_size=300
 schema_aggregation=head+tail
 gnn_hidden_size=256
 gnn_num_layers=8
 relation_share_layers='' #'--relation_share_layers'
-relation_share_heads=$3 #'--relation_share_heads'
+relation_share_heads='' #'--relation_share_heads'
 score_function=affine
 num_heads=8
 dropout=0.2

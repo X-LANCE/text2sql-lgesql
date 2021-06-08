@@ -48,11 +48,14 @@ The following commands are provided in `setup.sh`.
 
 ## Training
 
-Training LGESQL models with GLOVE, BERT and ELECTRA respectively: (msde: mixed static and dynamic embeddings ; mmc: multi-head multi-view concatenation)
+Training LGESQL models with GLOVE, BERT and ELECTRA respectively:
+  - msde: mixed static and dynamic embeddings
+  - mmc: multi-head multi-view concatenation
 
-    ./run/run_lgesql_glove.sh [mmc|msde]
-    ./run/run_lgesql_plm.sh [mmc|msde] bert-large-uncased-whole-word-masking
-    ./run/run_lgesql_plm.sh [mmc|msde] electra-large-discriminator
+
+        ./run/run_lgesql_glove.sh [mmc|msde]
+        ./run/run_lgesql_plm.sh [mmc|msde] bert-large-uncased-whole-word-masking
+        ./run/run_lgesql_plm.sh [mmc|msde] electra-large-discriminator
 
 ## Evaluation and submission
 
