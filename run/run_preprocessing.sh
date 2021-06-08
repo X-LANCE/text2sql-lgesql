@@ -8,8 +8,6 @@ dev_out='data/dev.bin'
 table_out='data/tables.bin'
 vocab_glove='pretrained_models/glove.42b.300d/vocab_glove.txt'
 vocab='pretrained_models/glove.42b.300d/vocab.txt'
-train_rgatsql='data/train.rgatsql.bin'
-dev_rgatsql='data/dev.rgatsql.bin'
 train_lgesql='data/train.lgesql.bin'
 dev_lgesql='data/dev.lgesql.bin'
 
@@ -20,7 +18,5 @@ python3 -u preprocess/process_dataset.py --dataset_path ${dev_data} --table_path
 echo "Start to build word vocab for the dataset ..."
 python3 -u preprocess/build_glove_vocab.py --data_paths ${train_out} --table_path ${table_out} --reference_file ${vocab_glove} --mwf 4 --output_path ${vocab}
 echo "Start to construct graphs for the dataset ..."
-python3 -u preprocess/process_graphs.py --dataset_path ${train_out} --table_path ${table_out} --method 'rgatsql' --output_path ${train_rgatsql}
-python3 -u preprocess/process_graphs.py --dataset_path ${dev_out} --table_path ${table_out} --method 'rgatsql' --output_path ${dev_rgatsql}
 python3 -u preprocess/process_graphs.py --dataset_path ${train_out} --table_path ${table_out} --method 'lgesql' --output_path ${train_lgesql}
 python3 -u preprocess/process_graphs.py --dataset_path ${dev_out} --table_path ${table_out} --method 'lgesql' --output_path ${dev_lgesql}
