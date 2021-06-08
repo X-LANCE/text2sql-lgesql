@@ -3,7 +3,7 @@ import os, json, pickle, argparse, sys, time
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from preprocess.graph_utils import GraphProcessor
 
-def process_dataset_graph(processor, dataset, tables, method, output_path=None, skip_large=True):
+def process_dataset_graph(processor, dataset, tables, method, output_path=None, skip_large=False):
     processed_dataset = []
     for idx, entry in enumerate(dataset):
         db = tables[entry['db_id']]

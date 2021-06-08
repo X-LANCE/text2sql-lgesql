@@ -1,4 +1,4 @@
-task=lgesql
+task=lgesql_glove
 seed=999
 device=0
 testing='' #'--testing'

@@ -1,4 +1,4 @@
-task=rgatsql
+task=rgatsql_glove
 seed=999
 device=0
 testing='' #'--testing'

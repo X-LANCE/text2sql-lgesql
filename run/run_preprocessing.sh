@@ -14,7 +14,7 @@ train_lgesql='data/train.lgesql.bin'
 dev_lgesql='data/dev.lgesql.bin'
 
 echo "Start to preprocess the original train dataset ..."
-python3 -u preprocess/process_dataset.py --dataset_path ${train_data} --raw_table_path ${table_data} --table_path ${table_out} --output_path ${train_out} #--verbose > train.log
+python3 -u preprocess/process_dataset.py --dataset_path ${train_data} --raw_table_path ${table_data} --table_path ${table_out} --output_path ${train_out} --skip_large #--verbose > train.log
 echo "Start to preprocess the original dev dataset ..."
 python3 -u preprocess/process_dataset.py --dataset_path ${dev_data} --table_path ${table_out} --output_path ${dev_out} #--verbose > dev.log
 echo "Start to build word vocab for the dataset ..."
