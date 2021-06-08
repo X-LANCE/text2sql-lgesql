@@ -59,9 +59,14 @@ Training LGESQL models with GLOVE, BERT and ELECTRA respectively:
 
 ## Evaluation and submission
 
-1. Save the trained model and its configuration (at least containing `model.bin` and `params.json`) into a new directory in `saved_models`.
-2. For evaluation, see `run/run_evaluation.sh` and `run/run_submission.sh` for reference.
-3. Model instances and submission scripts are available in [codalab:glove](https://worksheets.codalab.org/worksheets/0x509e0907c63f4f9ab92fe5490069aa7e) (code deprecated in this repo) and [codalab:plm](https://worksheets.codalab.org/worksheets/0x53017948b7dc4cbd95d3191a35f6b6b2).
+1. Create the directory `saved_models`, save the trained model and its configuration (at least containing `model.bin` and `params.json`) into a new directory under `saved_models`.
+
+2. For evaluation, see `run/run_evaluation.sh` and `run/run_submission.sh` (eval from scratch) for reference.
+
+3. Model instances and submission scripts are available in codalab:
+
+  - [codalab:glove](https://worksheets.codalab.org/worksheets/0x509e0907c63f4f9ab92fe5490069aa7e): word vectors GLOVE, codes deprecated, better train a new instance
+  - [codalab:plm](https://worksheets.codalab.org/worksheets/0x53017948b7dc4cbd95d3191a35f6b6b2): including BERT and ELECTRA
 
 
 ## Results
