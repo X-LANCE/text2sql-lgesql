@@ -23,7 +23,7 @@ The following commands are provided in `setup.sh`.
 2. Next, download dependencies:
 
         python -c "import stanza; stanza.download('en')"
-        python -c "from embeddings import GloveEmbedding, KazumaCharEmbedding; wemb, cemb = GloveEmbedding('common_crawl_48', d_emb=300), KazumaCharEmbedding()"
+        python -c "from embeddings import GloveEmbedding; emb = GloveEmbedding('common_crawl_48', d_emb=300)"
         python -c "import nltk; nltk.download('stopwords')"
 
 3. Download pre-trained language models from [`Hugging Face Model Hub`](https://huggingface.co/models), such as `bert-large-whole-word-masking` and `electra-large-discriminator`, into the `pretrained_models` directory. The vocab file for [`glove.42B.300d`](http://nlp.stanford.edu/data/glove.42B.300d.zip) is also pulled: (please ensure that `Git LFS` is installed)
@@ -42,7 +42,7 @@ The following commands are provided in `setup.sh`.
 
 2. Merge the `data/train_spider.json` and `data/train_others.json` into one single dataset `data/train.json`.
 
-3. Preprocess the train and dev dataset, including input normalization, schema linking and graph construction.
+3. Preprocess the train and dev dataset, including input normalization, schema linking, graph construction and output actions generation.
 
         ./run/run_preprocessing.sh
 
