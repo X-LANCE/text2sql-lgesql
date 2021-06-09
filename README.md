@@ -14,6 +14,7 @@ This is the project containing source code for the paper [*LGESQL: Line Graph En
 The following commands are provided in `setup.sh`.
 
 1. Firstly, create conda environment `text2sql`:
+  - In our experiments, we use **torch==1.6.0** and **dgl==0.5.3** with CUDA version 10.1
     
         conda create -n text2sql python=3.6
         source activate text2sql
