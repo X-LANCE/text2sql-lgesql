@@ -21,7 +21,7 @@ def preprocess_database_and_dataset(db_dir='database/', table_path='data/tables.
     output_tables = process_tables(processor, tables)
     output_dataset = process_dataset(processor, dataset, output_tables)
     graph_processor = GraphProcessor()
-    output_dataset = process_dataset_graph(graph_processor, dataset, output_tables, method=method)
+    output_dataset = process_dataset_graph(graph_processor, output_dataset, output_tables, method=method)
     return output_dataset, output_tables
 
 def load_examples(dataset, tables):
