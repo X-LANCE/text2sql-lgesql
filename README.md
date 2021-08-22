@@ -2,12 +2,23 @@
 
 This is the project containing source code for the paper [*LGESQL: Line Graph Enhanced Text-to-SQL Model with Mixed Local and Non-Local Relations*](https://arxiv.org/abs/2004.12299) in **ACL 2021 main conference**. If you find it useful, please cite our work.
 
-    @article{cao2021lgesql,
-        title={LGESQL: Line Graph Enhanced Text-to-SQL Model with Mixed Local and Non-Local Relations},
-        author={Cao, Ruisheng and Chen, Lu and Chen, Zhi and Zhu, Su and Yu, Kai},
-        journal={arXiv preprint arXiv:2106.01093},
-        year={2021}
-    }
+        @inproceedings{cao-etal-2021-lgesql,
+                title = "{LGESQL}: Line Graph Enhanced Text-to-{SQL} Model with Mixed Local and Non-Local Relations",
+                author = "Cao, Ruisheng  and
+                Chen, Lu  and
+                Chen, Zhi  and
+                Zhao, Yanbin  and
+                Zhu, Su  and
+                Yu, Kai",
+                booktitle = "Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers)",
+                month = aug,
+                year = "2021",
+                address = "Online",
+                publisher = "Association for Computational Linguistics",
+                url = "https://aclanthology.org/2021.acl-long.198",
+                doi = "10.18653/v1/2021.acl-long.198",
+                pages = "2541--2555",
+        }
 
 
 ## Create environment and download dependencies
@@ -43,7 +54,7 @@ The following commands are provided in `setup.sh`.
 
 2. Merge the `data/train_spider.json` and `data/train_others.json` into one single dataset `data/train.json`.
 
-3. Preprocess the train and dev dataset, including input normalization, schema linking, graph construction and output actions generation.
+3. Preprocess the train and dev dataset, including input normalization, schema linking, graph construction and output actions generation. (Our preprocessed dataset can be downloaded [here](https://drive.google.com/file/d/1L8sWlp7J9LWjw9MP2bHGsf0wC4xLAyxO/view?usp=sharing))
 
         ./run/run_preprocessing.sh
 
@@ -60,18 +71,15 @@ Training LGESQL models with GLOVE, BERT and ELECTRA respectively:
 
 ## Evaluation and submission
 
-1. Create the directory `saved_models`, save the trained model and its configuration (at least containing `model.bin` and `params.json`) into a new directory under `saved_models`.
+1. Create the directory `saved_models`, save the trained model and its configuration (at least containing `model.bin` and `params.json`) into a new directory under `saved_models`, e.g. `saved_models/electra-msde-75.1/`.
 
 2. For evaluation, see `run/run_evaluation.sh` and `run/run_submission.sh` (eval from scratch) for reference.
 
-3. Model instances and submission scripts are available in codalab:
-
-  - [codalab:glove](https://worksheets.codalab.org/worksheets/0x509e0907c63f4f9ab92fe5490069aa7e): word vectors GLOVE, codes deprecated, better train a new instance
-  - [codalab:plm](https://worksheets.codalab.org/worksheets/0x53017948b7dc4cbd95d3191a35f6b6b2): including BERT and ELECTRA
+3. Model instances and submission scripts are available in [codalab:plm](https://worksheets.codalab.org/worksheets/0x53017948b7dc4cbd95d3191a35f6b6b2) and [google drive](https://drive.google.com/file/d/1ALf5ycxMViHrT5WGuFO3g9eT7R2S1rgy/view?usp=sharing): including submitted BERT and ELECTRA models. Codes and model for GLOVE are deprecated.
 
 
 ## Results
-Dev and test **EXACT MATCH ACC** in the official [leaderboard](https://yale-lily.github.io//spider):
+Dev and test **EXACT MATCH ACC** in the official [leaderboard](https://yale-lily.github.io//spider), also provided in the `results` directory:
 
 | model | dev acc | test acc |
 | :---: | :---: | :---: |
