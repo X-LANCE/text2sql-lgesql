@@ -26,6 +26,7 @@ The following commands are provided in `setup.sh`.
 
 1. Firstly, create conda environment `text2sql`:
   - In our experiments, we use **torch==1.6.0** and **dgl==0.5.3** with CUDA version 10.1
+  - We use one GeForce RTX 2080 Ti for GLOVE and base-series pre-trained language model~(PLM) experiments, one Tesla V100-PCIE-32GB for large-series PLM experiments
     
         conda create -n text2sql python=3.6
         source activate text2sql
