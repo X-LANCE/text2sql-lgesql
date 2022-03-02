@@ -130,4 +130,4 @@ else:
     dev_acc = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval'), acc_type='sql')
     dev_acc_checker = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval.checker'), acc_type='sql', use_checker=True)
     dev_acc_beam = decode('dev', output_path=os.path.join(args.read_model_path, 'dev.eval.beam' + str(args.beam_size)), acc_type='beam')
-    logger.info("Evaluation costs %.2fs ; Dev dataset exact match/checker/beam acc is %.4f/%.4f ." % (time.time() - start_time, dev_acc, dev_acc_checker, dev_acc_beam))
+    logger.info("Evaluation costs %.2fs ; Dev dataset exact match/checker/beam acc is %.4f/%.4f/%.4f ." % (time.time() - start_time, dev_acc, dev_acc_checker, dev_acc_beam))
