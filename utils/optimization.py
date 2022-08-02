@@ -34,10 +34,10 @@ def set_optimizer(model, args, num_warmup_steps, num_training_steps, last_epoch=
     no_decay = ['bias', 'LayerNorm.weight']
     if plm and 0. < args.layerwise_decay <= 0.5: # seperate lr for plm
         grouped_params = [
-            {'params': list(set([p for n, p in params if 'plm_model' in n and not any(nd in n for nd in no_decay)])), 'lr': args.layerwise_decay * args.lr, 'weight_decay': args.l2},
-            {'params': list(set([p for n, p in params if 'plm_model' in n and any(nd in n for nd in no_decay)])), 'lr': args.layerwise_decay * args.lr, 'weight_decay': 0.0},
-            {'params': list(set([p for n, p in params if 'plm_model' not in n and not any(nd in n for nd in no_decay)])), 'weight_decay': args.l2},
-            {'params': list(set([p for n, p in params if 'plm_model' not in n and any(nd in n for nd in no_decay)])), 'weight_decay': 0.0},
+            {'params': [p for n, p in params if 'plm_model' in n and not any(nd in n for nd in no_decay)], 'lr': args.layerwise_decay * args.lr, 'weight_decay': args.l2},
+            {'params': [p for n, p in params if 'plm_model' in n and any(nd in n for nd in no_decay)], 'lr': args.layerwise_decay * args.lr, 'weight_decay': 0.0},
+            {'params': [p for n, p in params if 'plm_model' not in n and not any(nd in n for nd in no_decay)], 'weight_decay': args.l2},
+            {'params': [p for n, p in params if 'plm_model' not in n and any(nd in n for nd in no_decay)], 'weight_decay': 0.0},
         ]
         print('Use seperate lr %f for pretrained model ...' % (args.lr * args.layerwise_decay))
     elif plm and 0.5 < args.layerwise_decay < 1.: # lr decay layerwise for plm
@@ -54,15 +54,15 @@ def set_optimizer(model, args, num_warmup_steps, num_training_steps, last_epoch=
         grouped_params = []
         for d in groups["decay"]:
             lr = args.lr * (args.layerwise_decay ** (num_layers - d))
-            grouped_params.append({'params': list(set(groups["decay"][d])), 'lr': lr, 'weight_decay': args.l2})
+            grouped_params.append({'params': groups["decay"][d], 'lr': lr, 'weight_decay': args.l2})
         for d in groups["no_decay"]:
             lr = args.lr * (args.layerwise_decay ** (num_layers - d))
-            grouped_params.append({'params': list(set(groups["no_decay"][d])), 'lr': lr, 'weight_decay': 0.0})
+            grouped_params.append({'params': groups["no_decay"][d], 'lr': lr, 'weight_decay': 0.0})
         print('Use layerwise decay (rate %f) lr %f for pretrained model ...' % (args.layerwise_decay, args.lr))
     else: # the same lr for plm and other modules
         grouped_params = [
-            {'params': list(set([p for n, p in params if not any(nd in n for nd in no_decay)])), 'weight_decay': args.l2},
-            {'params': list(set([p for n, p in params if any(nd in n for nd in no_decay)])), 'weight_decay': 0.0},
+            {'params': [p for n, p in params if not any(nd in n for nd in no_decay)], 'weight_decay': args.l2},
+            {'params': [p for n, p in params if any(nd in n for nd in no_decay)], 'weight_decay': 0.0},
         ]
         print('Use the same lr %f for all parameters ...' % (args.lr))
     optimizer = AdamW(grouped_params, lr=args.lr, max_grad_norm=args.max_norm)
@@ -80,13 +80,13 @@ def get_ratsql_schedule_with_warmup(optimizer, num_warmup_steps, num_training_st
         return max(0.0, math.sqrt((num_training_steps - current_step) / float(num_training_steps - num_warmup_steps)))
     return LambdaLR(optimizer, lr_lambda, last_epoch)
 
-def get_constant_schedule(optimizer, *args, last_epoch=-1):
+def get_constant_schedule(optimizer, num_warmup_steps, num_training_steps, last_epoch=-1):
     """ Create a schedule with a constant learning rate.
     """
     return LambdaLR(optimizer, lambda _: 1, last_epoch=last_epoch)
 
 
-def get_constant_schedule_with_warmup(optimizer, num_warmup_steps, last_epoch=-1):
+def get_constant_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps, last_epoch=-1):
     """ Create a schedule with a constant learning rate preceded by a warmup
     period during which the learning rate increases linearly between 0 and 1.
     """
